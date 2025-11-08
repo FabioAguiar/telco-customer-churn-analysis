@@ -1,0 +1,59 @@
+# OS / Editores
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / Projeto
+.vscode/
+.idea/
+
+# Variáveis de ambiente / credenciais
+.env
+.env.*
+*.env
+secrets.*
+credentials.*
+
+# Estrutura do projeto
+data/raw/
+data/interim/
+data/processed/
+!data/.gitkeep
+!data/README.md
+
+reports/data_preparation.log
+!reports/.gitkeep
+!reports/README.md
+
+artifacts/manifest.json
+!artifacts/.gitkeep
+!artifacts/README.md
+
+# dashboards/
+!dashboards/.gitkeep
+!dashboards/README.md
+
+#prints/
+!prints/.gitkeep
+!prints/README.md
+
+*.log

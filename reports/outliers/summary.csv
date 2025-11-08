@@ -1,0 +1,4 @@
+flag,outliers_count
+tenure_is_outlier,0
+MonthlyCharges_is_outlier,0
+TotalCharges_is_outlier,0

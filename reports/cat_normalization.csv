@@ -1,0 +1,17 @@
+column,changed
+Contract,7043
+PaymentMethod,7043
+InternetService,5517
+OnlineSecurity,1526
+OnlineBackup,1526
+DeviceProtection,1526
+TechSupport,1526
+StreamingTV,1526
+StreamingMovies,1526
+MultipleLines,682
+gender,0
+Partner,0
+Dependents,0
+PhoneService,0
+PaperlessBilling,0
+Churn,0
