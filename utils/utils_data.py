@@ -87,7 +87,7 @@ __all__ = [
     "apply_outlier_flags"
 , "parse_dates_with_report_cfg", "expand_date_features_plus"]
 
-UTILS_DATA_VERSION = "1.2.2-merged"
+UTILS_DATA_VERSION = "1.2.2"
 
 logger = logging.getLogger("utils_data")
 if not logger.handlers:
@@ -2328,3 +2328,385 @@ def n2_build_models_ui(preprocess, X_train, y_train, X_test, y_test, models_dir,
 
     display(W.Box([panel], layout=W.Layout(width="100%")),
             HTML("<div class='lumen-console' style='margin-top:8px;'></div>"))
+
+
+# =========================================================
+# UI helpers & fontes "safe" (não expõe caminhos absolutos)
+# =========================================================
+try:
+    from IPython.display import display, HTML  # noqa
+except Exception:  # ambiente sem Jupyter
+    def display(*_args, **_kwargs):  # type: ignore
+        pass
+    class HTML:  # type: ignore
+        def __init__(self, *_a, **_k): pass
+
+from pathlib import Path
+from datetime import datetime
+import pandas as _pd
+
+# bump de versão (opcional)
+try:
+    UTILS_DATA_VERSION
+    UTILS_DATA_VERSION = str(UTILS_DATA_VERSION) + "+ui-helpers"
+except NameError:
+    UTILS_DATA_VERSION = "1.2.3-ui"
+
+_UI_ACCENTS = {
+    "info": "#0ea5e9",
+    "ok": "#22c55e",
+    "warn": "#f59e0b",
+    "err": "#ef4444",
+    "muted": "#64748b",
+    "violet": "#8b5cf6",
+    "teal": "#10b981",
+}
+
+def human_size(num_bytes: int) -> str:
+    """Converte bytes em B/KB/MB/GB/TB com formatação amigável.
+    - Para KB/MB/GB: 0 casas decimais se >= 100; 1 casa se < 100.
+    """
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = float(num_bytes)
+    u = 0
+    while size >= 1024 and u < len(units) - 1:
+        size /= 1024.0
+        u += 1
+    if u == 0:
+        return f"{int(size)} {units[u]}"
+    fmt = "{:.0f}" if size >= 100 else "{:.1f}"
+    return f"{fmt.format(size)} {units[u]}"
+
+def list_raw_sources_safe(raw_dir: Path, pattern: str = "*", show_rel: bool = True,
+                          rel_root: str = "data/raw") -> _pd.DataFrame:
+    """Lista arquivos em data/raw sem expor caminho absoluto.
+    Retorna colunas: file, size, size_bytes, modified, relpath (opcional).
+    """
+    rows = []
+    for p in sorted(raw_dir.glob(pattern)):
+        if not p.is_file():
+            continue
+        st = p.stat()
+        rows.append({
+            "file": p.name,
+            "size": human_size(st.st_size),
+            "size_bytes": st.st_size,
+            "modified": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"),
+            **({"relpath": str(Path(rel_root) / p.name)} if show_rel else {})
+        })
+    cols = ["file", "size", "size_bytes", "modified"] + (["relpath"] if show_rel else [])
+    return _pd.DataFrame(rows, columns=cols)
+
+def _card_html(title: str, subtitle: str = "", accent: str = _UI_ACCENTS["teal"]) -> HTML:
+    """Cria um 'card' simples para separar seções no notebook."""
+    return HTML(f"""
+    <div style="border:1px solid #e5e7eb;border-left:6px solid {accent};
+                border-radius:10px;padding:12px 14px;margin:16px 0;background:#fafafa">
+      <div style="font-weight:700;font-size:16px;line-height:1.2">{title}</div>
+      <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+    </div>
+    """)
+
+
+
+def overview_table(df: pd.DataFrame) -> pd.DataFrame:
+    """Resumo compacto de linhas/colunas/memória."""
+    mem_mb = df.memory_usage(deep=True).sum() / (1024**2)
+    rows = [
+        {"Métrica": "Linhas",        "Valor": _fmt_compact(df.shape[0])},
+        {"Métrica": "Colunas",       "Valor": _fmt_compact(df.shape[1])},
+        {"Métrica": "Memória (MB)",  "Valor": _fmt_compact(mem_mb)},
+    ]
+    return pd.DataFrame(rows, columns=["Métrica", "Valor"])
+
+def dtypes_summary(df: _pd.DataFrame) -> _pd.DataFrame:
+    """Contagem por dtype (string)."""
+    return (df.dtypes.astype(str)
+              .value_counts()
+              .rename_axis("dtype")
+              .reset_index(name="cols"))
+
+def missing_top(df: pd.DataFrame, top: int = 20) -> pd.DataFrame:
+    """Top N colunas com mais faltantes + dtype, com formatação compacta."""
+    try:
+        mr = missing_report(df)  # usa a função já existente
+        # adicionar dtype
+        dtype_map = df.dtypes.astype(str).to_dict()
+        mr["dtype"] = mr["column"].map(dtype_map)
+
+        # renomear colunas para a saída final
+        mr = mr.rename(columns={
+            "column": "Coluna",
+            "missing_count": "Faltantes",
+            "missing_pct": "%Faltantes"
+        })
+
+        # ordenar e limitar
+        mr = mr.sort_values("%Faltantes", ascending=False).head(top).reset_index(drop=True)
+
+        # tipos adequados e formatação compacta
+        mr["Faltantes"] = mr["Faltantes"].astype(int)
+        # arredonda para 3 casas e remove zeros excedentes na hora de exibir
+        mr["%Faltantes"] = mr["%Faltantes"].round(3).map(_fmt_compact)
+
+        # reorganizar colunas para ficar mais intuitivo
+        cols = ["Coluna", "dtype", "Faltantes", "%Faltantes"]
+        mr = mr[cols]
+        return mr
+    except Exception:
+        # fallback simples se algo der errado
+        nuls = df.isna().sum().sort_values(ascending=False)
+        out = pd.DataFrame({"Coluna": nuls.index, "Faltantes": nuls.values})
+        out["%Faltantes"] = (out["Faltantes"] / len(df)) * 100
+        out["dtype"] = out["Coluna"].map(df.dtypes.astype(str).to_dict())
+        out["Faltantes"] = out["Faltantes"].astype(int)
+        out["%Faltantes"] = out["%Faltantes"].round(3).map(_fmt_compact)
+        cols = ["Coluna", "dtype", "Faltantes", "%Faltantes"]
+        return out[cols].head(top).reset_index(drop=True)
+
+def show_block(title: str, subtitle: str, df_display: _pd.DataFrame, accent: str = _UI_ACCENTS["info"]) -> None:
+    """Mostra um card com título/subtítulo seguido de um DataFrame estilizado."""
+    display(_card_html(title, subtitle, accent=accent))
+    try:
+        display(df_display.style.set_properties(**{"font-size": "12px"}))
+    except Exception:
+        display(df_display)
+
+def show_source_overview(name: str, path: Path, df: _pd.DataFrame) -> None:
+    """Mostra três cards: overview, dtypes e faltantes para uma fonte específica."""
+    show_block(f"📥 Fonte: {name}", f"Arquivo: {path.name}", overview_table(df), accent=_UI_ACCENTS["info"])
+    show_block("🧬 Tipos (resumo)", "Contagem por dtype", dtypes_summary(df), accent=_UI_ACCENTS["muted"])
+    show_block("🩺 Faltantes (top 20)", "Colunas com mais ausentes", missing_top(df, top=20), accent=_UI_ACCENTS["warn"])
+
+def show_df_summary(df: _pd.DataFrame, label: str = "DF base", accent: str = _UI_ACCENTS["ok"]) -> None:
+    """Mostra overview, dtypes e faltantes para um DataFrame 'principal' do pipeline."""
+    show_block(f"🧾 Visão geral — {label}", "", overview_table(df), accent=accent)
+    show_block(f"🧬 Tipos (resumo) — {label}", "Contagem por dtype", dtypes_summary(df), accent=_UI_ACCENTS["muted"])
+    show_block(f"🩺 Faltantes (top 20) — {label}", "Após merges (se houver)", missing_top(df, top=20), accent=_UI_ACCENTS["warn"])
+
+
+def _fmt_compact(x):
+    """Formata números sem zeros inúteis.
+    - int -> 123
+    - float -> até 3 casas, removendo zeros (ex.: 6.821, 0.5, 12)
+    """
+    import numpy as _np
+    import pandas as _pd
+
+    if x is None or (isinstance(x, float) and _np.isnan(x)):
+        return ""
+    # numpy types
+    if isinstance(x, (_np.integer, )):
+        return int(x)
+    if isinstance(x, (_np.floating, )):
+        xf = float(x)
+        if xf.is_integer():
+            return int(xf)
+        s = f"{xf:.3f}".rstrip("0").rstrip(".")
+        return s
+    # pandas scalar int/float
+    if isinstance(x, (int, )):
+        return x
+    if isinstance(x, float):
+        if float(x).is_integer():
+            return int(x)
+        s = f"{x:.3f}".rstrip("0").rstrip(".")
+        return s
+    return x
+
+# ========= PATCH: UI "neat" + runner de Qualidade & Tipagem =========
+# (cole este bloco no final do utils_data.py)
+
+from typing import Optional, Sequence, Mapping, Any, Tuple, Dict
+import pandas as _pd
+from IPython.display import display, HTML
+import logging as _logging
+from contextlib import contextmanager as _contextmanager
+from pathlib import Path as _Path
+
+# ---------- formatação ----------
+def _fmt_auto(x: float, decimals: int = 2) -> str:
+    """Se for inteiro, sem casas; senão, até 'decimals' casas (trim)."""
+    try:
+        if float(x).is_integer():
+            return str(int(round(float(x))))
+        s = f"{float(x):.{decimals}f}"
+        return s.rstrip("0").rstrip(".")
+    except Exception:
+        return str(x)
+
+def _fmt_mem_mb(x_mb: float) -> str:
+    """Formata memória em MB com até 2 casas, sem zeros finais."""
+    return f"{_fmt_auto(x_mb, 2)} MB"
+
+# ---------- helpers de exibição ----------
+def _card(title: str, subtitle: str = "", accent: str = "#22c55e") -> HTML:
+    return HTML(f"""
+    <div style="border:1px solid #e5e7eb;border-left:6px solid {accent};
+                border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+      <div style="font-weight:700;font-size:16px;letter-spacing:.2px">{title}</div>
+      <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+    </div>
+    """)
+
+def _overview_table_neat(df: _pd.DataFrame) -> _pd.DataFrame:
+    mem_mb = df.memory_usage(deep=True).sum() / (1024**2)
+    return _pd.DataFrame([
+        {"Métrica": "Linhas",       "Valor": int(df.shape[0])},
+        {"Métrica": "Colunas",      "Valor": int(df.shape[1])},
+        {"Métrica": "Memória (MB)", "Valor": _fmt_mem_mb(mem_mb)},
+    ])
+
+def _dtypes_summary(df: _pd.DataFrame) -> _pd.DataFrame:
+    return (df.dtypes.astype(str)
+              .value_counts()
+              .rename_axis("dtype")
+              .reset_index(name="cols"))
+
+def _missing_top_with_dtype(df: _pd.DataFrame, top: int = 20) -> _pd.DataFrame:
+    miss_cnt = df.isna().sum()
+    miss_pct = df.isna().mean().mul(100)
+    dtypes = df.dtypes.astype(str)
+    out = (
+        _pd.DataFrame({
+            "Coluna": df.columns,
+            "Tipo": [dtypes[c] for c in df.columns],
+            "Faltantes": miss_cnt.values,
+            "%Faltantes": miss_pct.values
+        })
+        .sort_values("%Faltantes", ascending=False)
+        .head(top)
+        .reset_index(drop=True)
+    )
+    # formatação bonita
+    out["Faltantes"] = out["Faltantes"].map(lambda v: int(v))
+    out["%Faltantes"] = out["%Faltantes"].map(lambda v: _fmt_auto(float(v), 2))
+    return out
+
+def _show_block(title: str, subtitle: str, df_display: _pd.DataFrame, accent: str = "#0ea5e9") -> None:
+    display(_card(title, subtitle, accent=accent))
+    try:
+        display(df_display.style.set_properties(**{"font-size": "12px"}))
+    except Exception:
+        display(df_display)
+
+# ---------- APIs "neat" para fontes e df final ----------
+def show_source_overview_neat(name: str, path: _Path | str, df: _pd.DataFrame) -> None:
+    path = _Path(path)
+    _show_block(f"📥 Fonte: {name}", f"Arquivo: {path.name}", _overview_table_neat(df), accent="#0ea5e9")
+    _show_block("🧬 Tipos (resumo)", "Contagem por dtype", _dtypes_summary(df), accent="#64748b")
+    _show_block("🩺 Faltantes (top 20)", "Colunas com mais ausentes", _missing_top_with_dtype(df), accent="#f59e0b")
+
+def show_df_summary_neat(df: _pd.DataFrame, label: str = "DF base") -> None:
+    _show_block(f"🧾 Visão geral — {label}", "", _overview_table_neat(df), accent="#22c55e")
+    _show_block(f"🧬 Tipos (resumo) — {label}", "Contagem por dtype", _dtypes_summary(df), accent="#64748b")
+    _show_block(f"🩺 Faltantes (top 20) — {label}", "Após merges (se houver)", _missing_top_with_dtype(df), accent="#f59e0b")
+
+# ---------- silenciador de logs do módulo ----------
+@_contextmanager
+def _quiet_utils_data_logger():
+    try:
+        logger  # usa o logger já definido no módulo
+    except Exception:
+        # fallback: cria logger compatível, se não existir
+        import sys as _sys
+        _lg = _logging.getLogger("utils_data")
+        if not _lg.handlers:
+            h = _logging.StreamHandler(_sys.stdout)
+            h.setFormatter(_logging.Formatter("[%(levelname)s] %(message)s"))
+            _lg.addHandler(h)
+        globals()["logger"] = _lg  # injeta
+    prev = logger.level
+    try:
+        logger.setLevel(_logging.WARNING)
+        yield
+    finally:
+        logger.setLevel(prev)
+
+# ---------- Runner + Render para Qualidade & Tipagem ----------
+def run_quality_and_typing(df: _pd.DataFrame, config: Mapping[str, Any]) -> Dict[str, Any]:
+    """
+    Executa a etapa de Qualidade & Tipagem com logs silenciados.
+    Retorna dict com:
+      {
+        "df": DataFrame final,
+        "impacto": DataFrame Linhas/Colunas/Memória (antes/depois),
+        "conversoes": cast_report filtrado (apenas mudanças reais) ou None,
+        "dups": duplicatas (amostra) ou None,
+        "dups_summary": resumo de duplicatas ou None
+      }
+    """
+    import pandas as pd
+    df_before_shape = df.shape
+    mem_before = df.memory_usage(deep=True).sum() / (1024**2)
+
+    with _quiet_utils_data_logger():
+        if hasattr(globals().get("n1_quality_typing_dict", None), "__call__"):
+            rep = n1_quality_typing_dict(df, config)
+            df2 = rep["df"]
+        else:
+            df2, meta = n1_quality_typing(df, config)
+            rep = meta if isinstance(meta, dict) else {"df": df2}
+
+    mem_after  = df2.memory_usage(deep=True).sum() / (1024**2)
+    delta_rows = df2.shape[0] - df_before_shape[0]
+    delta_cols = df2.shape[1] - df_before_shape[1]
+    delta_mem  = mem_after - mem_before
+
+    impacto = pd.DataFrame([
+        {"Métrica":"Linhas",  "Antes": int(df_before_shape[0]), "Depois": int(df2.shape[0]), "Δ": int(delta_rows)},
+        {"Métrica":"Colunas", "Antes": int(df_before_shape[1]), "Depois": int(df2.shape[1]), "Δ": int(delta_cols)},
+        {"Métrica":"Memória", "Antes": _fmt_mem_mb(mem_before), "Depois": _fmt_mem_mb(mem_after), "Δ": f"{delta_mem:+.2f} MB"},
+    ])
+
+    cast_report = rep.get("cast_report") if isinstance(rep, dict) else None
+    conversoes = None
+    if isinstance(cast_report, pd.DataFrame) and not cast_report.empty:
+        conv = cast_report.copy()
+        conv = conv[(conv["converted_non_null"] > 0) | (conv["dtype_after"] != "object")].copy()
+        for c in ("converted_non_null","introduced_nans"):
+            if c in conv.columns:
+                conv[c] = conv[c].astype(int)
+        if not conv.empty:
+            conversoes = conv[["column","converted_non_null","introduced_nans","dtype_after"]]
+
+    dups = rep.get("duplicates") if isinstance(rep, dict) else None
+    dsum = rep.get("duplicates_summary") if isinstance(rep, dict) else None
+    # normaliza vazios para None
+    if isinstance(dups, pd.DataFrame) and dups.empty:
+        dups = None
+    if isinstance(dsum, pd.DataFrame) and dsum.empty:
+        dsum = None
+
+    return {
+        "df": df2,
+        "impacto": impacto,
+        "conversoes": conversoes,
+        "dups": dups,
+        "dups_summary": dsum
+    }
+
+def render_quality_and_typing(result: Dict[str, Any]) -> None:
+    """Exibe os cards organizados com base no retorno do run_quality_and_typing()."""
+    display(_card("🧹 Qualidade & Tipagem", "Conversões, memória e checagens básicas"))
+    display(result["impacto"])
+
+    if result.get("conversoes") is not None:
+        display(_card("🔢 Conversões aplicadas", "Somente o que realmente mudou"))
+        display(result["conversoes"])
+
+    if result.get("dups") is not None:
+        display(_card("🔁 Duplicatas detectadas", "Amostra"))
+        display(result["dups"].head(10))
+        if result.get("dups_summary") is not None:
+            display(result["dups_summary"].head(20))
+    else:
+        display(_card("✅ Sem duplicidades", "Nenhuma chave duplicada detectada"))
+
+    nota = (
+        "<b>Notas rápidas:</b><br>"
+        "• Valores “introduced_nans” indicam entradas não parseáveis (ex.: strings vazias).<br>"
+        "• Você pode imputar/filtrar esses casos nas próximas etapas."
+    )
+    display(HTML(f"<div style='color:#6b7280;font-size:12px'>{nota}</div>"))
+# ======================= FIM DO PATCH =======================
