@@ -1,10 +1,14 @@
-# OS / Editores
+# ============================================
+# ⚙️ SISTEMA / EDITORES
+# ============================================
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
 
-# Python
+# ============================================
+# 🐍 PYTHON
+# ============================================
 __pycache__/
 *.py[cod]
 *.pyo
@@ -19,41 +23,67 @@ build/
 .coverage
 htmlcov/
 
-# Jupyter
+# ============================================
+# 📓 JUPYTER NOTEBOOKS
+# ============================================
 .ipynb_checkpoints/
+*.nbconvert.ipynb
 
-# IDE / Projeto
+# ============================================
+# 💡 IDE / PROJETO
+# ============================================
 .vscode/
 .idea/
 
-# Variáveis de ambiente / credenciais
+# ============================================
+# 🔒 VARIÁVEIS DE AMBIENTE / CREDENCIAIS
+# ============================================
 .env
 .env.*
 *.env
 secrets.*
 credentials.*
 
-# Estrutura do projeto
+# ============================================
+# 📁 ESTRUTURA DE DADOS DO PROJETO
+# ============================================
 data/raw/
 data/interim/
 data/processed/
 !data/.gitkeep
 !data/README.md
 
+processed.parquet
+
+# ============================================
+# 📑 RELATÓRIOS E LOGS
+# ============================================
+reports/*.log
 reports/data_preparation.log
+reports/manifest.json
+reports/artifacts/**
 !reports/.gitkeep
 !reports/README.md
 
-artifacts/manifest.json
+# ============================================
+# 🧱 ARTEFATOS E METADADOS
+# ============================================
+artifacts/**/*.json
+artifacts/**/*.csv
 !artifacts/.gitkeep
 !artifacts/README.md
 
-# dashboards/
+# ============================================
+# 📊 DASHBOARDS / IMPRESSÕES
+# ============================================
+dashboards/**
+prints/**
 !dashboards/.gitkeep
 !dashboards/README.md
-
-#prints/
 !prints/.gitkeep
 !prints/README.md
 
+# ============================================
+# 🧾 LOGS GERAIS
+# ============================================
 *.log

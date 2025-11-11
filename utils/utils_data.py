@@ -588,22 +588,30 @@ def handle_missing_step(df: pd.DataFrame,
       - Gera relatório 'antes' (reports/missing/before.csv)
       - Aplica estratégia (simple | knn | iterative). 'auto' lê do config com fallbacks
       - Gera relatório 'depois' (reports/missing/after.csv)
+
+    Compatibilidade: mantém assinatura, contratos e caminhos do método original.
+    Melhorias: não cria flags encadeadas (evita *_was_missing_was_missing...) e
+               só flaggeia colunas que tinham NaN de fato.
     Retorna dict: {'df','before','after','strategy','imputed_cols'}
     """
     df = coerce_df(df)
 
-    # Lê config em dois formatos possíveis
+    # --- helpers internos ----------------------------------------------------
+    def _is_flag(col: str) -> bool:
+        return isinstance(col, str) and col.endswith("_was_missing")
+
+    # Lê config nos dois formatos aceitos
     missing_cfg = dict(config.get("missing", {}))
     handle = bool(config.get("handle_missing", missing_cfg.get("enabled", True)))
     strategy = (config.get("missing_strategy",
                            missing_cfg.get("strategy", "simple")) or "simple").lower()
 
     # Parâmetros extras (com defaults)
-    knn_k = int(missing_cfg.get("knn_k", 5))
+    knn_k  = int(missing_cfg.get("knn_k", 5))
     it_max = int(missing_cfg.get("iterative_max_iter", 10))
     it_seed = int(missing_cfg.get("iterative_random_state", 42))
 
-    # Onde salvar relatórios
+    # Onde salvar relatórios (preserva seus caminhos relativos)
     before_rel = "missing/before.csv"
     after_rel  = "missing/after.csv"
 
@@ -623,58 +631,106 @@ def handle_missing_step(df: pd.DataFrame,
         out["after"] = rep_before.copy()
         return out
 
-    # Estratégias
+    # --------------------- Estratégias (com salvaguardas) --------------------
     def _simple(df_in: pd.DataFrame):
-        df_out, meta = simple_impute_with_flags(df_in)
-        cols = [m["col"] for m in meta.get("imputed", [])]
-        return df_out, cols, "simple"
+        """
+        Usa simple_impute_with_flags apenas nas colunas não-flag e reintegra no df original,
+        evitando criar flags encadeadas.
+        """
+        non_flag_cols = [c for c in df_in.columns if not _is_flag(c)]
+        if not non_flag_cols:
+            return df_in, [], "simple"
+
+        # roda imputação/flags apenas nas colunas de interesse
+        sub = df_in[non_flag_cols].copy()
+        df_imp, meta = simple_impute_with_flags(sub)
+        cols_imp = [m["col"] for m in meta.get("imputed", [])] if isinstance(meta, dict) else []
+
+        df_out = df_in.copy()
+        # substitui valores imputados nas colunas originais
+        for c in non_flag_cols:
+            if c in df_imp.columns:
+                df_out[c] = df_imp[c]
+
+        # adiciona flags criadas (apenas de primeira camada)
+        for c in df_imp.columns:
+            if _is_flag(c) and c not in df_out.columns:
+                df_out[c] = df_imp[c]
+
+        return df_out, cols_imp, "simple"
 
     def _knn(df_in: pd.DataFrame):
+        """
+        Imputa numéricos com KNNImputer; cria flags apenas para colunas numéricas
+        que realmente tinham NaN (e evita flags encadeadas/duplicadas).
+        """
         try:
             from sklearn.impute import KNNImputer  # type: ignore
         except Exception:
-            # fallback
             return _simple(df_in)
-        num_cols = [c for c in df_in.columns if pd.api.types.is_numeric_dtype(df_in[c])]
+
+        num_cols = [c for c in df_in.columns
+                    if (not _is_flag(c)) and pd.api.types.is_numeric_dtype(df_in[c])]
         if not num_cols:
             return _simple(df_in)
+
+        missing_num_cols = [c for c in num_cols if df_in[c].isna().any()]
+        if not missing_num_cols:
+            # nada a imputar -> mantém como está
+            return df_in.copy(), [], "knn"
+
         df_out = df_in.copy()
-        for c in num_cols:
-            df_out[f"{c}_was_missing"] = df_out[c].isna().astype(int)
+        # flags apenas para colunas numéricas com NaN (e não duplicar se já existe)
+        for c in missing_num_cols:
+            flag = f"{c}_was_missing"
+            if flag not in df_out.columns:
+                df_out[flag] = df_out[c].isna().astype(int)
+
         imputer = KNNImputer(n_neighbors=knn_k)
         df_out[num_cols] = imputer.fit_transform(df_out[num_cols])
-        # cols imputadas: as que tinham NaN
-        cols = [c for c in num_cols if df_in[c].isna().any()]
-        return df_out, cols, "knn"
+
+        return df_out, missing_num_cols, "knn"
 
     def _iterative(df_in: pd.DataFrame):
+        """
+        Imputa numéricos com IterativeImputer; cria flags apenas para colunas numéricas
+        que tinham NaN (evita encadeamento e duplicatas).
+        """
         try:
             from sklearn.experimental import enable_iterative_imputer  # noqa: F401
             from sklearn.impute import IterativeImputer  # type: ignore
         except Exception:
             return _simple(df_in)
-        num_cols = [c for c in df_in.columns if pd.api.types.is_numeric_dtype(df_in[c])]
+
+        num_cols = [c for c in df_in.columns
+                    if (not _is_flag(c)) and pd.api.types.is_numeric_dtype(df_in[c])]
         if not num_cols:
             return _simple(df_in)
+
+        missing_num_cols = [c for c in num_cols if df_in[c].isna().any()]
+        if not missing_num_cols:
+            return df_in.copy(), [], "iterative"
+
         df_out = df_in.copy()
-        for c in num_cols:
-            df_out[f"{c}_was_missing"] = df_out[c].isna().astype(int)
+        for c in missing_num_cols:
+            flag = f"{c}_was_missing"
+            if flag not in df_out.columns:
+                df_out[flag] = df_out[c].isna().astype(int)
+
         imp = IterativeImputer(max_iter=it_max, random_state=it_seed, sample_posterior=False)
         df_out[num_cols] = imp.fit_transform(df_out[num_cols])
-        cols = [c for c in num_cols if df_in[c].isna().any()]
-        return df_out, cols, "iterative"
 
-    # Seleção da estratégia com fallback
+        return df_out, missing_num_cols, "iterative"
+
+    # Seleção da estratégia com fallback (preserva sua lógica)
     chosen = strategy if prefer == "auto" else prefer
     try_chain = {
-        "simple":    (_simple,   ["simple"]),
-        "knn":       (_knn,      ["knn", "simple"]),
-        "iterative": (_iterative,["iterative", "simple"]),
-        "mice":      (_iterative,["iterative", "simple"]),
-        "auto":      (None,      [strategy, "simple"]),
+        "simple":    (_simple,    ["simple"]),
+        "knn":       (_knn,       ["knn", "simple"]),
+        "iterative": (_iterative, ["iterative", "simple"]),
+        "mice":      (_iterative, ["iterative", "simple"]),
+        "auto":      (None,       [strategy, "simple"]),
     }
-
-    # resolve ordem de tentativa
     order = try_chain.get("auto" if prefer == "auto" else chosen, (None, ["simple"]))[1]
 
     df_work = df
@@ -968,6 +1024,168 @@ def build_calendar_from(df: pd.DataFrame, col: str, freq: str = "D") -> pd.DataF
     cal["quarter"] = cal["date"].dt.quarter
     return cal
 
+# --- Calendário · etapa orquestrada + render --------------------------------
+def _ensure_datetime_with_ratio(
+    s: pd.Series,
+    *,
+    dayfirst: bool = False,
+    as_utc: bool = False,
+    min_ratio: float = 0.80
+) -> tuple[pd.Series, float]:
+    """
+    Tenta converter uma série para datetime de forma tolerante.
+    Retorna (serie_convertida, parse_ratio).
+    Não levanta warning; cai em NaT quando não converte.
+    """
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        parsed = pd.to_datetime(s, errors="coerce", dayfirst=dayfirst, utc=as_utc)
+    ratio = float(parsed.notna().mean()) if len(parsed) else 0.0
+    return parsed, ratio
+
+
+def run_calendar_step(
+    df: pd.DataFrame,
+    *,
+    date_col: str | None = None,
+    freq: str = "D",
+    output: str | None = None,
+    config: Mapping[str, Any] | None = None,
+    paths: Any | None = None,
+    catalog: Any | None = None,  # ex.: objeto T (catálogo), se existir
+) -> dict[str, Any]:
+    """
+    Orquestra a criação da dimensão calendário:
+      - Resolve parâmetros a partir do `config["calendar"]` (se presente)
+      - Descobre coluna de data automaticamente quando não for informada
+      - Converte para datetime com verificação de 'parse_ratio'
+      - Constrói, salva e (opcional) registra no catálogo
+      - Retorna dict com artefatos e mensagens
+
+    Retorno:
+      {
+        "status": "ok" | "skipped" | "error",
+        "reason": <mensagem se skipped/error>,
+        "date_col": <coluna usada ou None>,
+        "freq": <freq>,
+        "output": <caminho final>,
+        "dim_date": <DataFrame ou None>,
+        "period": (start, end) ou None
+      }
+    """
+    log = logger if "logger" in globals() else None
+    cal_cfg = dict((config or {}).get("calendar", {}))
+
+    # Prioridade: argumentos diretos > config > defaults
+    date_col = date_col or cal_cfg.get("date_col")
+    freq = freq or cal_cfg.get("freq", "D")
+    output = output or cal_cfg.get("output")
+
+    # Descoberta automática da coluna caso não informada
+    if not date_col:
+        dt_cols = [c for c in df.columns if pd.api.types.is_datetime64_any_dtype(df[c])]
+        date_col = dt_cols[0] if dt_cols else None
+
+    if not date_col:
+        msg = "Nenhum campo de data disponível. Defina 'date_col' ou trate datas antes."
+        if log: log.info(f"[calendar] {msg}")
+        return {"status": "skipped", "reason": msg, "date_col": None, "freq": freq,
+                "output": output, "dim_date": None, "period": None}
+
+    s = df[date_col]
+    if not pd.api.types.is_datetime64_any_dtype(s):
+        # Puxa preferências globais de datas, se existirem
+        dates_cfg = dict((config or {}).get("dates", {}))
+        dayfirst = bool(dates_cfg.get("dayfirst", False))
+        as_utc   = bool(dates_cfg.get("utc", False))
+        parsed, ratio = _ensure_datetime_with_ratio(
+            s, dayfirst=dayfirst, as_utc=as_utc, min_ratio=dates_cfg.get("min_ratio", 0.80)
+        )
+        if ratio >= float(dates_cfg.get("min_ratio", 0.80)):
+            df[date_col] = parsed
+        else:
+            msg = (f"Coluna '{date_col}' não está em datetime (parse_ratio={ratio:.2f}). "
+                   "Ajuste a etapa de Tratamento de Datas.")
+            if log: log.warning(f"[calendar] {msg}")
+            return {"status": "error", "reason": msg, "date_col": date_col, "freq": freq,
+                    "output": output, "dim_date": None, "period": None}
+
+    # Resolve saída padrão se não informada
+    if not output:
+        try:
+            output = str(paths.processed_dir / "dim_date.parquet")  # convenção do template
+        except Exception:
+            output = "data/processed/dim_date.parquet"
+
+    # Constrói calendário
+    dim_date = build_calendar_from(df, date_col, freq=freq)
+
+    # Persiste respeitando extensão
+    save_table(dim_date, output)
+    if log: log.info(f"[calendar] dim_date salvo em: {output}")
+
+    # (Opcional) registrar no catálogo
+    try:
+        if catalog is not None:
+            catalog.add("dim_date", dim_date)
+            if log: log.info("[calendar] 'dim_date' registrado no catálogo.")
+    except Exception:
+        pass
+
+    start_date = dim_date["date"].min()
+    end_date   = dim_date["date"].max()
+
+    return {
+        "status": "ok",
+        "reason": "",
+        "date_col": date_col,
+        "freq": freq,
+        "output": output,
+        "dim_date": dim_date,
+        "period": (start_date, end_date),
+    }
+
+
+def render_calendar_step(info: Mapping[str, Any]) -> None:
+    """Renderiza um resumo amigável da etapa calendário."""
+    from IPython.display import display, HTML
+    import pandas as pd
+
+    def _card(title, subtitle=""):
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #10b981;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    status = info.get("status")
+    display(_card("📆 Dimensão Calendário", f"Status: {status}"))
+
+    if status == "ok":
+        start, end = info.get("period") or (None, None)
+        date_col = info.get("date_col")
+        freq = info.get("freq")
+        output = info.get("output")
+        display(HTML(
+            f"<div style='font-size:12px;color:#374151'>"
+            f"<b>Coluna de origem:</b> {date_col} &nbsp;|&nbsp; "
+            f"<b>Freq:</b> {freq} &nbsp;|&nbsp; "
+            f"<b>Saída:</b> <code>{output}</code><br>"
+            f"<b>Período:</b> {getattr(start, 'date', lambda: start)()} → "
+            f"{getattr(end, 'date', lambda: end)()} &nbsp;|&nbsp; "
+            f"<b>Linhas:</b> {len(info.get('dim_date'))}"
+            f"</div>"
+        ))
+        # Prévia
+        display(info.get("dim_date").head(12))
+    else:
+        reason = info.get("reason", "")
+        display(HTML(f"<div style='font-size:12px;color:#6b7280'>{reason}</div>"))
+
+
 # -----------------------------------------------------------------------------
 # Texto
 # -----------------------------------------------------------------------------
@@ -987,6 +1205,149 @@ def extract_text_features(df: pd.DataFrame, cols: Optional[Sequence[str]] = None
     if report_path:
         save_report_df(report, report_path, root=root)
     return df, report
+
+def render_text_features_summary(
+    summary_df: pd.DataFrame,
+    *,
+    title: str = "📝 Tratamento de Texto",
+    subtitle: str = "Comprimento, contagem de palavras e hits de keywords",
+    keywords: list[str] | None = None,
+    top: int = 20
+) -> None:
+    """
+    Exibe um painel compacto e legível para o resumo de features de texto.
+    Não altera dados; apenas organiza a visualização em três blocos:
+      1) Card + métricas gerais
+      2) Colunas com maior avg_len / avg_words
+      3) Totais de hits por keyword (se houver)
+    """
+    from IPython.display import display, HTML
+    import pandas as pd
+    import numpy as np
+
+    if summary_df is None or summary_df.empty:
+        display(HTML("<div style='color:#6b7280'>— Nenhum resumo de texto disponível —</div>"))
+        return
+
+    def _card(title, subtitle=""):
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #6366f1;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    # 1) Cabeçalho + métricas gerais
+    display(_card(title, subtitle))
+    n_cols = int(summary_df.shape[0])
+    total_non_null = int(summary_df.get("non_null", pd.Series(dtype=int)).sum() or 0)
+    met = pd.DataFrame([
+        {"Métrica": "Colunas textuais analisadas", "Valor": n_cols},
+        {"Métrica": "Total de células não nulas (texto)", "Valor": total_non_null},
+    ])
+    display(met)
+
+    # 2) Prioridades: maiores comprimentos médios e contagem média de palavras
+    cols_base = [c for c in ["column", "non_null", "avg_len", "avg_words"] if c in summary_df.columns]
+    if cols_base:
+        view_len = (summary_df[cols_base]
+                    .sort_values(["avg_len","avg_words"], ascending=False)
+                    .head(top)
+                    .reset_index(drop=True))
+        display(_card("🔎 Top colunas por comprimento médio", "Ordenado por avg_len e avg_words"))
+        display(view_len)
+
+    # 3) Totais por keyword (se existir padrão kw_*_count)
+    kw_cols = [c for c in summary_df.columns if c.startswith("kw_") and c.endswith("_count")]
+    if kw_cols:
+        totals = summary_df[kw_cols].sum(axis=0).sort_values(ascending=False)
+        df_totals = (totals.rename("ocorrencias")
+                           .to_frame()
+                           .reset_index()
+                           .rename(columns={"index": "keyword_metric"}))
+        # Se o caller passou keywords, reorganiza na ordem fornecida
+        if keywords:
+            desired = [f"kw_{k}_count" for k in keywords]
+            df_totals["order"] = df_totals["keyword_metric"].apply(lambda x: desired.index(x) if x in desired else 10_000)
+            df_totals = df_totals.sort_values(["order","ocorrencias"], ascending=[True, False]).drop(columns=["order"])
+        display(_card("🏷️ Ocorrências por keyword", "Soma das aparições por coluna analisada"))
+        display(df_totals)
+
+    # 4) Dica leve
+    display(HTML("<div style='color:#6b7280;font-size:12px;margin-top:4px'>"
+                 "Dica: ajuste TEXT_CFG['keywords'] para acompanhar termos de negócio relevantes.</div>"))
+
+def extract_text_features_fast(
+    df: pd.DataFrame,
+    *,
+    lower: bool = True,
+    strip_collapse_ws: bool = True,
+    keywords: list[str] | None = None,
+    blacklist: list[str] | None = None,
+    export_summary: bool = True,
+    summary_dir: str | os.PathLike | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Versão otimizada: acumula novas colunas em um dict e concatena de uma vez,
+    evitando alta fragmentação de DataFrame.
+    """
+    import re, os
+    from pathlib import Path
+
+    keywords = keywords or []
+    blacklist = set(blacklist or [])
+    df_out = df.copy()
+    new_cols = {}  # <- acumula aqui
+
+    text_cols = [c for c in df_out.columns
+                 if c not in blacklist and (df_out[c].dtype == "object" or pd.api.types.is_string_dtype(df_out[c]))]
+
+    rows = []
+    for c in text_cols:
+        s = df_out[c].astype("string")
+        if lower: s = s.str.lower()
+        if strip_collapse_ws:
+            s = s.str.replace(r"\s+", " ", regex=True).str.strip()
+
+        # métricas
+        non_null = int(s.notna().sum())
+        avg_len = float(s.dropna().str.len().mean() or 0.0)
+        avg_words = float(s.dropna().str.split().str.len().mean() or 0.0)
+
+        # flags por keyword
+        kw_counts = {}
+        for kw in keywords:
+            kw_flag = f"kw_{kw}_flag"
+            kw_count = f"kw_{kw}_count"
+            patt = rf"\b{re.escape(kw)}\b"
+            flag_series = s.str.contains(patt, regex=True, na=False)
+            new_cols[kw_flag] = flag_series
+            kw_counts[kw_count] = int(flag_series.sum())
+
+        # linha do summary
+        row = {"column": c, "non_null": non_null, "avg_len": round(avg_len, 2), "avg_words": round(avg_words, 2)}
+        row.update(kw_counts)
+        rows.append(row)
+
+    # concatena todas as novas colunas de uma vez
+    if new_cols:
+        df_out = pd.concat([df_out, pd.DataFrame(new_cols, index=df_out.index)], axis=1)
+
+    summary = pd.DataFrame(rows).sort_values(["avg_len","avg_words"], ascending=False).reset_index(drop=True)
+
+    if export_summary and summary_dir:
+        summary_dir = Path(summary_dir)
+        summary_dir.mkdir(parents=True, exist_ok=True)
+        outp = summary_dir / "text_features_summary.csv"
+        summary.to_csv(outp, index=False, encoding="utf-8")
+        try:
+            logger.info(f"[text] resumo salvo em: {outp} ({summary.shape[1]} colunas)")
+        except Exception:
+            pass
+
+    return df_out, summary
+
 
 # -----------------------------------------------------------------------------
 # Target e pipeline compacto
@@ -1018,74 +1379,90 @@ def build_target(df: pd.DataFrame, config: Mapping[str, Any]) -> Tuple[pd.DataFr
 # -----------------------------------------------------------------------------
 def ensure_target_from_config(df: pd.DataFrame, config: dict, verbose: bool = False):
     """
-    Garante a existência de uma coluna target conforme configuração.
+    Garante a existência/consistência do target conforme o config['target'].
 
-    Retorna:
-      df, target_name, class_map, report_df
+    Retorna: df, target_name, class_map, report_df
+    - Nunca sobrescreve um target existente.
+    - Compara valores de forma case-insensitive e com strip().
     """
     import pandas as pd
 
-    # Ler parâmetros do config
-    tgt_cfg = config.get("target", {})
-    target_name = tgt_cfg.get("name", "target")
-    positive = tgt_cfg.get("positive", None)
-    negative = tgt_cfg.get("negative", None)
-    src_col = tgt_cfg.get("source", None)
+    tgt_cfg   = dict(config.get("target", {}))
+    tname     = tgt_cfg.get("name", "target")
+    positive  = tgt_cfg.get("positive")
+    negative  = tgt_cfg.get("negative")
+    src_col   = tgt_cfg.get("source")
 
-    # Caso já exista no dataset
-    if target_name in df.columns:
+    def _norm(x):
+        return None if x is None else str(x).strip().casefold()
+
+    pos_n = _norm(positive)
+    neg_n = _norm(negative)
+
+    # 1) Se o target já existe, apenas reporta (idempotente)
+    if tname in df.columns:
         if verbose:
-            print(f"[target] Coluna '{target_name}' já existe — nenhuma ação necessária.")
-        tgt_report = pd.DataFrame({
-            "target": [target_name],
-            "status": ["já existe"],
-            "source": [src_col or target_name],
+            print(f"[target] Coluna '{tname}' já existe — nenhuma ação necessária.")
+        # tenta inferir classes do próprio df, com casefold
+        s_norm = df[tname].astype(str).str.strip().str.casefold()
+        uniq   = sorted([u for u in s_norm.dropna().unique().tolist()])
+        # class_map informativo: se houver pos/neg no config, mantenha
+        class_map = {1: positive, 0: negative} if (positive is not None and negative is not None) else {u:i for i,u in enumerate(uniq)}
+        report = pd.DataFrame({
+            "target":   [tname],
+            "status":   ["já existe"],
+            "source":   [src_col or tname],
             "positive": [positive],
             "negative": [negative]
         })
-        class_map = {1: positive, 0: negative}
-        return df, target_name, class_map, tgt_report
+        return df, tname, class_map, report
 
-    # Se precisar derivar a coluna a partir de outra
+    # 2) Se não existe, mas há coluna fonte
     if src_col and src_col in df.columns:
         if verbose:
-            print(f"[target] Criando '{target_name}' a partir da coluna '{src_col}'.")
-
-        series = df[src_col]
+            print(f"[target] Criando '{tname}' a partir de '{src_col}'.")
+        s = df[src_col]
 
         if positive is not None and negative is not None:
-            df[target_name] = series.map({positive: 1, negative: 0})
-        elif series.dtype == "bool":
-            df[target_name] = series.astype(int)
+            s_norm = s.astype(str).str.strip().str.casefold()
+            df[tname] = pd.NA
+            df.loc[s_norm == pos_n, tname] = 1
+            df.loc[s_norm == neg_n, tname] = 0
+            class_map = {1: positive, 0: negative}
+        elif s.dtype == "bool":
+            df[tname] = s.astype(int)
+            class_map = {1: True, 0: False}
         else:
-            # fallback genérico: mapeia valores únicos
-            unique_vals = sorted(series.dropna().unique())
-            mapping = {val: i for i, val in enumerate(unique_vals)}
-            df[target_name] = series.map(mapping)
+            uniq = sorted(s.dropna().unique().tolist())
+            mapping = {val: i for i, val in enumerate(uniq)}
+            df[tname] = s.map(mapping)
             if verbose:
                 print(f"[target] Mapeamento automático: {mapping}")
+            class_map = mapping
 
-        class_map = {1: positive, 0: negative} if positive and negative else mapping
-        status = "criado"
-    else:
+        rep = pd.DataFrame({
+            "target":   [tname],
+            "status":   ["criado"],
+            "source":   [src_col],
+            "positive": [positive],
+            "negative": [negative]
+        })
         if verbose:
-            print("[target] Nenhuma coluna de origem encontrada — criando target nulo.")
-        df[target_name] = pd.NA
-        class_map = {}
-        status = "não criado"
+            print(f"[target] Conclusão: criado ({tname})")
+        return df, tname, class_map, rep
 
-    tgt_report = pd.DataFrame({
-        "target": [target_name],
-        "status": [status],
-        "source": [src_col],
+    # 3) Sem target e sem fonte → não cria nada “vazio” (evita ruído)
+    if verbose:
+        print(f"[target] Nem target '{tname}' existe nem source configurada. Nenhuma ação tomada.")
+    rep = pd.DataFrame({
+        "target":   [tname],
+        "status":   ["não criado"],
+        "source":   [src_col],
         "positive": [positive],
         "negative": [negative]
     })
+    return df, tname, {}, rep
 
-    if verbose:
-        print(f"[target] Conclusão: {status} ({target_name})")
-
-    return df, target_name, class_map, tgt_report
 
 
 def apply_encoding_and_scaling(df: pd.DataFrame,
@@ -1503,6 +1880,115 @@ def parse_dates_with_report_cfg(
 
     return out, report_df, parsed_cols
 
+
+# --- Datas · utilitários de varredura e renderização ------------------------
+def scan_date_candidates(
+    df: pd.DataFrame,
+    cfg: Mapping[str, Any] | None = None,
+    *,
+    min_ratio: float = 0.20,
+    sample: int | None = 2000
+) -> pd.DataFrame:
+    """
+    Scanner silencioso de possíveis colunas de data entre colunas object/strings.
+    - Evita spam de UserWarning do pandas (fallback dateutil).
+    - Tenta formatos explícitos do cfg antes do parsing genérico.
+    - Opcionalmente amostra as séries para acelerar a detecção.
+
+    Retorna DataFrame com: column, dtype, parse_ratio, sample_examples
+    (ordenado por parse_ratio desc).
+    """
+    import warnings
+
+    cfg = dict(cfg or {})
+    dayfirst = bool(cfg.get("dayfirst", False))
+    as_utc   = bool(cfg.get("utc", False))
+    formats  = list(cfg.get("formats", []) or [])
+
+    obj_cols = [c for c in df.columns
+                if df[c].dtype == "object" or pd.api.types.is_string_dtype(df[c])]
+    rows = []
+
+    for c in obj_cols:
+        s = df[c]
+        if sample and len(s) > sample:
+            s = s.sample(sample, random_state=42)
+
+        # Tenta formatos declarados primeiro (sem barulho)
+        parsed = None
+        if formats:
+            for fmt in formats:
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", category=UserWarning)
+                        p = pd.to_datetime(s, format=fmt, errors="coerce",
+                                           dayfirst=dayfirst, utc=as_utc)
+                    if p.notna().mean() >= min_ratio:
+                        parsed = p
+                        break
+                except Exception:
+                    pass
+
+        # Se não bateu nenhum formato, tenta parsing genérico (silencioso)
+        if parsed is None:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=UserWarning)
+                parsed = pd.to_datetime(s, errors="coerce",
+                                        dayfirst=dayfirst, utc=as_utc)
+
+        ratio = float(parsed.notna().mean())
+        if ratio >= 0.01:  # só registra se houve algum parsing
+            ex = s.dropna().astype(str).unique().tolist()[:5]
+            rows.append({
+                "column": c,
+                "dtype": str(df[c].dtype),
+                "parse_ratio": round(ratio, 3),
+                "sample_examples": ex
+            })
+
+    out = pd.DataFrame(rows)
+    if not out.empty:
+        out = out.sort_values("parse_ratio", ascending=False).reset_index(drop=True)
+    return out
+
+
+def render_date_step(parsed_cols: list[str],
+                     parse_report: pd.DataFrame | None = None,
+                     candidates: pd.DataFrame | None = None,
+                     created_features: list[str] | None = None) -> None:
+    """Renderiza cards e tabelas para a etapa de datas."""
+    from IPython.display import display, HTML
+    import pandas as pd
+
+    def _card(title, subtitle=""):
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #0ea5e9;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    display(_card("📅 Tratamento de Datas", "Detecção, parsing e expansão de features"))
+
+    if parsed_cols:
+        msg = f"{len(parsed_cols)} coluna(s) convertida(s): {parsed_cols}"
+        display(HTML(f"<div style='color:#16a34a;font-size:12px'>{msg}</div>"))
+        if isinstance(parse_report, pd.DataFrame) and not parse_report.empty:
+            display(HTML("<b>📑 Relatório de parsing (amostra):</b>"))
+            display(parse_report.head(20))
+        if created_features:
+            display(HTML("<b>🧩 Features de data criadas (amostra):</b>"))
+            display(pd.DataFrame({"feature": created_features}).head(20))
+    else:
+        display(HTML("<div style='color:#6b7280;font-size:12px'>Nenhuma coluna de data detectada ou convertida.</div>"))
+        if isinstance(candidates, pd.DataFrame) and not candidates.empty:
+            display(_card("🔎 Possíveis colunas de data", "Use dates.explicit_cols e/ou dates.formats"))
+            display(candidates.head(20))
+            display(HTML("<div style='color:#6b7280;font-size:12px'>"
+                         "Dica: mova as colunas acima para <code>dates.explicit_cols</code> "
+                         "e/ou informe <code>dates.formats</code> no config."
+                         "</div>"))
 
 
 # -----------------------------------------------------------------------------
@@ -2710,3 +3196,719 @@ def render_quality_and_typing(result: Dict[str, Any]) -> None:
     )
     display(HTML(f"<div style='color:#6b7280;font-size:12px'>{nota}</div>"))
 # ======================= FIM DO PATCH =======================
+
+def suggest_categorical_candidates(
+    df,
+    max_unique_ratio: float = 0.5,
+    max_unique_count: int = 50,
+    include_numeric_small: bool = True,
+):
+    """
+    Sugere colunas candidatas à padronização categórica com base em heurísticas:
+    - dtypes texto/categoria/bool sempre entram
+    - numéricas com poucos valores únicos entram se include_numeric_small=True
+    - calcula cardinalidade, % único e exemplos
+
+    Retorna DataFrame com:
+      column, dtype, n_unique, pct_unique, sample_values, suspected, reasons
+    """
+    import pandas as pd
+    import numpy as np
+
+    rows = []
+    n_rows = max(1, len(df))
+    lower_yes = {"yes","y","sim","s","true","t","1"}
+    lower_no  = {"no","n","nao","não","false","f","0"}
+    service_phrases = {"no internet service", "no phone service"}
+
+    for c in df.columns:
+        s = df[c]
+        dt = str(s.dtype)
+        try:
+            nun = int(s.nunique(dropna=True))
+        except Exception:
+            nun = int(pd.Series(s).nunique(dropna=True))
+        pct = float(nun) / float(n_rows) if n_rows else 0.0
+
+        # dtype flags
+        is_textual = (dt == "object") or pd.api.types.is_string_dtype(s) or pd.api.types.is_categorical_dtype(s)
+        is_boolish = pd.api.types.is_bool_dtype(s)
+        is_small_numeric = (pd.api.types.is_numeric_dtype(s) and nun <= 10) if include_numeric_small else False
+
+        suspected = bool(is_textual or is_boolish or is_small_numeric)
+        reasons = []
+        if is_textual: reasons.append("texto/categoria")
+        if is_boolish: reasons.append("booleano")
+        if is_small_numeric: reasons.append("numérico baixa cardinalidade")
+
+        # sinaliza padrões binários
+        sample = pd.Series(s.dropna().astype(str).head(200)).str.strip().str.lower()
+        uniq_sample = set(pd.Series(s.dropna().astype(str).str.strip().str.lower().unique()[:50]))
+        if len(uniq_sample & lower_yes) > 0 or len(uniq_sample & lower_no) > 0:
+            reasons.append("binário (yes/no)")
+            suspected = True
+        if len(uniq_sample & service_phrases) > 0:
+            reasons.append("frases de serviço (mapear p/ 'No')")
+            suspected = True
+
+        # coleta exemplos
+        top_vals = (
+            s.astype(str)
+             .str.slice(0, 60)
+             .value_counts(dropna=True)
+             .head(5)
+             .index.tolist()
+        )
+        rows.append({
+            "column": c,
+            "dtype": dt,
+            "n_unique": nun,
+            "pct_unique": round(pct, 4),
+            "sample_values": top_vals,
+            "suspected": suspected,
+            "reasons": ", ".join(reasons) if reasons else "",
+        })
+
+    out = pd.DataFrame(rows).sort_values(
+        ["suspected", "n_unique"], ascending=[False, True]
+    ).reset_index(drop=True)
+    return out
+
+
+def run_categorical_normalization(df, cfg, report_path=None, silence_logs=True):
+    """
+    Executa a padronização categórica com 'normalize_categories' (suporta API avançada e fallback).
+    Retorna:
+      {
+        "df": df_norm,
+        "report": cat_norm_report (DataFrame),
+        "impacto": DataFrame Linhas/Colunas/Memória (antes/depois/Δ),
+        "_details": {...}
+      }
+    """
+    import logging
+    import pandas as pd
+    from pathlib import Path as _Path
+
+    _logger = globals().get("logger") or logging.getLogger(__name__)
+    prev = _logger.level
+    try:
+        if silence_logs:
+            _logger.setLevel(logging.WARNING)
+
+        before_shape = df.shape
+        before_mem = df.memory_usage(deep=True).sum() / (1024**2)
+
+        # tenta API avançada
+        cat_norm_report = None
+        used_fallback = False
+        try:
+            df_norm, cat_norm_report = normalize_categories(  # type: ignore
+                df,
+                cfg=cfg,
+                report_path=report_path
+            )
+        except TypeError:
+            # fallback para assinatura simples
+            used_fallback = True
+            text_cols = [c for c in df.columns if (df[c].dtype == "object") or pd.api.types.is_string_dtype(df[c])]
+            exclude = set((cfg or {}).get("exclude", []))
+            target_cols = [c for c in text_cols if c not in exclude]
+            df_before = df.copy()
+
+            df_norm = normalize_categories(  # type: ignore
+                df,
+                cols=target_cols,
+                case=(cfg or {}).get("case", "lower"),
+                trim=(cfg or {}).get("trim", True),
+                strip_accents=(cfg or {}).get("strip_accents", True),
+            )
+            if isinstance(df_norm, tuple):
+                df_norm = df_norm[0]
+
+            # constrói relatório mínimo
+            changes = []
+            for c in target_cols:
+                changed = (df_before[c].astype(str) != df_norm[c].astype(str)).sum()
+                if changed > 0:
+                    changes.append({"column": c, "changed": int(changed)})
+            import pandas as pd
+            cat_norm_report = pd.DataFrame(changes).sort_values("changed", ascending=False).reset_index(drop=True)
+
+        # persistência opcional
+        if report_path is not None and isinstance(cat_norm_report, pd.DataFrame):
+            try:
+                _p = _Path(report_path)
+                _p.parent.mkdir(parents=True, exist_ok=True)
+                cat_norm_report.to_csv(_p, index=False, encoding="utf-8")
+                # registra em manifest, se o util existir
+                if "save_report_df" in globals():
+                    try:
+                        save_report_df(cat_norm_report, _p)  # type: ignore
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # impacto
+        after_mem = df_norm.memory_usage(deep=True).sum() / (1024**2)
+        delta_rows = df_norm.shape[0] - before_shape[0]
+        delta_cols = df_norm.shape[1] - before_shape[1]
+        delta_mem  = after_mem - before_mem
+
+        def _fmt_mem(x): return f"{x:.2f} MB"
+        impacto = pd.DataFrame([
+            {"Métrica":"Linhas",  "Antes": int(before_shape[0]), "Depois": int(df_norm.shape[0]), "Δ": int(delta_rows)},
+            {"Métrica":"Colunas", "Antes": int(before_shape[1]), "Depois": int(df_norm.shape[1]), "Δ": int(delta_cols)},
+            {"Métrica":"Memória", "Antes": _fmt_mem(before_mem), "Depois": _fmt_mem(after_mem), "Δ": f"{delta_mem:+.2f} MB"},
+        ])
+
+        return {
+            "df": df_norm,
+            "report": cat_norm_report,
+            "impacto": impacto,
+            "_details": {
+                "used_fallback": used_fallback,
+                "before_shape": before_shape,
+                "after_shape": df_norm.shape,
+                "mem_before": before_mem,
+                "mem_after": after_mem,
+            }
+        }
+    finally:
+        if silence_logs:
+            _logger.setLevel(prev)
+
+
+def render_categorical_normalization(result, report_head: int = 20):
+    """
+    Renderiza cartões HTML e o relatório gerado por `run_categorical_normalization`.
+    """
+    from IPython.display import display, HTML
+    import pandas as pd
+
+    def _card(title, subtitle=""):
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #7c3aed;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    display(_card("🏷️ Padronização Categórica", "Normalização de texto, mapeamentos globais e ajustes por coluna"))
+    impacto = result.get("impacto")
+    if isinstance(impacto, pd.DataFrame) and not impacto.empty:
+        display(impacto)
+
+    rep = result.get("report")
+    if isinstance(rep, pd.DataFrame) and not rep.empty:
+        display(_card("📑 Relatório (top mudanças)", "Primeiras linhas do relatório de normalização"))
+        display(rep.head(report_head))
+    else:
+        display(_card("✅ Nenhuma mudança significativa", "Colunas categóricas já estavam padronizadas"))
+
+    used_fb = result.get("_details", {}).get("used_fallback", False)
+    rodape = "Modo: função avançada" if not used_fb else "Modo: fallback simples"
+    display(HTML(f"<div style='color:#6b7280;font-size:12px'>"
+                 f"{rodape}. Artefatos gravados quando 'report_path' é fornecido.</div>"))
+# ============================================================================
+
+
+def render_categorical_candidates(
+    df,
+    cand=None,
+    max_unique_ratio: float = 0.5,
+    max_unique_count: int = 50,
+    include_numeric_small: bool = True,
+    base_dir=None,
+    top_n: int = 30,
+    head_bin: int = 20,
+    head_service: int = 20,
+):
+    """
+    Renderiza cards organizados para candidatos de padronização categórica.
+    - Se `cand` for None, chama `suggest_categorical_candidates` com os limites fornecidos.
+    - Se `base_dir` for um caminho válido, salva CSVs em base_dir/'categorical_candidates'.
+    - Não altera nenhuma função existente; apenas usa utilitários já presentes.
+    """
+    import pandas as pd
+    from IPython.display import display, HTML
+    from pathlib import Path as _Path
+
+    # 0) Geração de candidatos (se não fornecido)
+    if cand is None:
+        if "suggest_categorical_candidates" in globals():
+            cand = suggest_categorical_candidates(
+                df,
+                max_unique_ratio=max_unique_ratio,
+                max_unique_count=max_unique_count,
+                include_numeric_small=include_numeric_small,
+            )
+        else:
+            raise RuntimeError("suggest_categorical_candidates não está disponível em utils_data.")
+
+    # 1) Preparos
+    def _card(title, subtitle=""):
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #7c3aed;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    cand_view = (cand
+        .sort_values(["suspected", "n_unique"], ascending=[False, True])
+        .reset_index(drop=True))
+
+    # Destaques
+    reasons_series = cand.get("reasons")
+    if reasons_series is not None:
+        binarios = cand[reasons_series.str.contains("binário", case=False, na=False)].copy()
+        servicos = cand[reasons_series.str.contains("serviço", case=False, na=False)].copy()
+    else:
+        binarios = cand.iloc[0:0].copy()
+        servicos = cand.iloc[0:0].copy()
+
+    summary = pd.DataFrame([
+        {"Métrica": "Total de colunas", "Valor": int(len(df.columns))},
+        {"Métrica": "Candidatas (suspected=True)", "Valor": int(cand["suspected"].sum()) if "suspected" in cand.columns else 0},
+        {"Métrica": "Binárias (sugeridas Yes/No)", "Valor": int(len(binarios))},
+        {"Métrica": "Com frases de serviço", "Valor": int(len(servicos))},
+    ])
+
+    cols_base = ["column", "dtype", "n_unique", "pct_unique", "sample_values", "reasons"]
+
+    # 2) Exibição
+    display(_card("🏷️ Descoberta de Candidatos à Padronização Categórica",
+                  "Heurísticas de cardinalidade, tipos e padrões textuais"))
+    display(summary)
+
+    if not cand_view.empty:
+        display(_card("🔎 Top candidatos (prioridade)", "Ordenado por suspeita e baixa cardinalidade"))
+        display(cand_view.loc[:, [c for c in cols_base if c in cand_view.columns]].head(top_n))
+
+    if not binarios.empty:
+        display(_card("✅ Provavelmente binárias (Yes/No)", "Bom ponto para mapear Yes/No no CAT_NORM_CFG"))
+        display(binarios.loc[:, [c for c in cols_base if c in binarios.columns]].head(head_bin))
+
+    if not servicos.empty:
+        display(_card("📡 Frases de serviço", "Ex.: 'No internet service' → 'No' (use global_map)"))
+        display(servicos.loc[:, [c for c in cols_base if c in servicos.columns]].head(head_service))
+
+    # 3) Persistência opcional
+    out_dir = None
+    try:
+        if base_dir is not None:
+            out_dir = _Path(base_dir)
+        elif "paths" in globals() and hasattr(globals().get("paths"), "reports_dir"):
+            out_dir = _Path(globals()["paths"].reports_dir)  # type: ignore
+
+        if out_dir is not None:
+            out_dir = out_dir / "categorical_candidates"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            cand_view.loc[:, [c for c in cols_base if c in cand_view.columns]].to_csv(out_dir / "candidatos_priorizados.csv", index=False, encoding="utf-8")
+            if not binarios.empty:
+                binarios.loc[:, [c for c in cols_base if c in binarios.columns]].to_csv(out_dir / "candidatos_binarios.csv", index=False, encoding="utf-8")
+            if not servicos.empty:
+                servicos.loc[:, [c for c in cols_base if c in servicos.columns]].to_csv(out_dir / "candidatos_frases_servico.csv", index=False, encoding="utf-8")
+    except Exception:
+        # Persistência é best-effort; a interface visual é prioritária
+        pass
+
+
+# === Renderizador da etapa de Tratamento de Valores Faltantes ===============
+def render_missing_step(res, df):
+    """
+    Renderiza um resumo visual e auditável do tratamento de valores faltantes.
+
+    Parameters
+    ----------
+    res : dict
+        Resultado retornado por utils_data.handle_missing_step()
+    df : pandas.DataFrame
+        DataFrame resultante após a imputação
+    """
+    import pandas as pd
+    from IPython.display import display, HTML
+
+    def _card(title, subtitle=""):
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #0ea5e9;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    # --- Cabeçalho
+    display(_card("🧩 Tratamento de Valores Faltantes", "Imputação + flags de auditoria (_was_missing)"))
+
+    before = res.get("before", pd.DataFrame())
+    after  = res.get("after", pd.DataFrame())
+
+    total_missing_before = int(before["missing_count"].sum()) if "missing_count" in before else 0
+    cols_with_missing_before = int((before["missing_count"] > 0).sum()) if "missing_count" in before else 0
+
+    # Flags criadas (colunas *_was_missing)
+    flag_rows = after[after["column"].str.endswith("_was_missing")] if "column" in after else pd.DataFrame()
+    flags_created = int(flag_rows.shape[0])
+
+    summary = pd.DataFrame([
+        {"Métrica": "Estratégia", "Valor": res.get("strategy", "—")},
+        {"Métrica": "Linhas no df", "Valor": int(df.shape[0])},
+        {"Métrica": "Colunas no df", "Valor": int(df.shape[1])},
+        {"Métrica": "Total de valores faltantes (antes)", "Valor": total_missing_before},
+        {"Métrica": "Colunas com faltantes (antes)", "Valor": cols_with_missing_before},
+        {"Métrica": "Flags criadas (_was_missing)", "Valor": flags_created},
+    ])
+
+    display(summary)
+
+    # --- Antes: colunas com faltantes
+    top_before = (before.sort_values("missing_count", ascending=False)
+                         .query("missing_count > 0") if "missing_count" in before else pd.DataFrame())
+
+    if not top_before.empty:
+        display(_card("🔎 Antes: colunas com faltantes (topo)", "Ordenado por quantidade de faltantes"))
+        display(top_before.head(20))
+    else:
+        display(_card("✅ Antes: sem faltantes", "Nenhuma coluna possuía valores ausentes"))
+
+    # --- Depois da imputação
+    display(_card("🧪 Depois da imputação", "Verificação de faltantes e flags"))
+    still_missing = (
+        after[~after["column"].str.endswith("_was_missing")].query("missing_count > 0")
+        if "column" in after and "missing_count" in after else pd.DataFrame()
+    )
+    if not still_missing.empty:
+        display(HTML("<div style='color:#b91c1c;font-size:12px'>⚠️ Ainda existem faltantes nas colunas abaixo:</div>"))
+        display(still_missing.sort_values("missing_count", ascending=False).head(20))
+    else:
+        display(HTML("<div style='color:#16a34a;font-size:12px'>Tudo ok: nenhuma coluna permanece com faltantes.</div>"))
+
+    # --- Flags criadas
+    if flags_created > 0:
+        display(_card("🏳️ Flags de auditoria criadas", "Colunas *_was_missing adicionadas ao DataFrame"))
+        display(flag_rows.sort_values("column").head(30))
+# ============================================================================
+
+# === Renderizador da etapa de Detecção de Outliers ===========================
+def render_outlier_flags(out_info: dict, df=None, top_n: int = 20, title: str = "🚨 Detecção de Outliers"):
+    """
+    Exibe cards com resumo e ranking de flags de outlier criadas.
+    - out_info: dict retornado por apply_outlier_flags(...)
+      chaves esperadas (tolerante a ausência): created_flags, method, counts, summary_path
+    - df: DataFrame (opcional) para calcular % de linhas afetadas
+    - top_n: quantas flags exibir no ranking
+    """
+    import pandas as pd
+    from IPython.display import display, HTML
+
+    def _card(title, subtitle=""):
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #ef4444;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    method = out_info.get("method", "—")
+    created = int(out_info.get("created_flags", 0))
+    counts  = out_info.get("counts") or {}
+    nrows   = int(getattr(df, "shape", (0, 0))[0]) if df is not None else None
+
+    # Cabeçalho
+    display(_card(title, f"Método: {method} · Flags criadas: {created}"))
+
+    # Resumo
+    total_outliers = int(sum(int(v) for v in counts.values())) if counts else 0
+    impacted_cols  = int(sum(1 for v in counts.values() if v and int(v) > 0))
+    summary_rows = [
+        {"Métrica": "Linhas no df", "Valor": nrows if nrows is not None else "—"},
+        {"Métrica": "Flags criadas", "Valor": created},
+        {"Métrica": "Colunas com outliers (>0)", "Valor": impacted_cols},
+        {"Métrica": "Total de marcações de outlier", "Valor": total_outliers},
+    ]
+    summary = pd.DataFrame(summary_rows)
+    display(summary)
+
+    # Ranking (top_n)
+    if counts:
+        rank = (pd.Series(counts).astype(int)
+                .sort_values(ascending=False)
+                .rename("outliers")
+                .to_frame())
+        rank.index.name = "flag"
+        if nrows:
+            rank["pct"] = (rank["outliers"] / nrows * 100).round(2)
+        display(_card("📈 Top flags por incidência", f"Exibindo até {top_n}"))
+        cols = ["outliers"] + (["pct"] if "pct" in rank.columns else [])
+        display(rank.head(top_n)[cols])
+    else:
+        display(HTML("<div style='color:#16a34a;font-size:12px'>Nenhuma flag foi criada.</div>"))
+
+    # Caminho do relatório (se existir)
+    summary_path = out_info.get("summary_path") or out_info.get("report_path")
+    if summary_path:
+        display(HTML(f"<div style='color:#6b7280;font-size:12px;margin-top:8px'>Resumo salvo em: <code>{summary_path}</code></div>"))
+# =============================================================================
+
+# === Encoders & Scalers · Orquestração + Render ===
+def run_encoding_and_scaling(df: "pd.DataFrame",
+                             config: "Mapping[str, Any] | None" = None) -> "tuple[pd.DataFrame, dict]":
+    """
+    Executa a etapa unificada de Codificação Categórica & Escalonamento Numérico,
+    delegando para a função já existente `apply_encoding_and_scaling(df, config)`.
+
+    Retorna:
+        df_out: DataFrame transformado (códigos + escalas aplicadas)
+        info:   dict com chaves usuais:
+                - "summary": DataFrame resumo (se existir)
+                - "encoded_cols": list[str]
+                - "scaled_cols": list[str]
+                - "artifacts_dir": str | Path (se existir)
+    """
+    import pandas as pd  # local import para evitar dependências globais
+
+    cfg = config or {}
+    try:
+        df_out, info = apply_encoding_and_scaling(df, cfg)
+    except TypeError:
+        # Em algumas versões antigas a assinatura podia ser (df) apenas.
+        # Fallback defensivo para não quebrar:
+        df_out, info = apply_encoding_and_scaling(df)  # type: ignore
+
+    # Normaliza campos obrigatórios do info
+    info = info or {}
+    info.setdefault("encoded_cols", info.get("encoded_cols", []))
+    info.setdefault("scaled_cols", info.get("scaled_cols", []))
+
+    # Constrói um resumo se a função base não forneceu
+    if "summary" not in info or info.get("summary") is None:
+        try:
+            import pandas as pd
+            enc = list(info.get("encoded_cols") or [])
+            scl = list(info.get("scaled_cols") or [])
+            rows = []
+            if enc:
+                rows.append({"step": "encoding", "count": len(enc), "example": ", ".join(enc[:5])})
+            if scl:
+                rows.append({"step": "scaling", "count": len(scl), "example": ", ".join(scl[:5])})
+            info["summary"] = pd.DataFrame(rows)
+        except Exception:
+            pass
+
+    return df_out, info
+
+
+def render_encoding_and_scaling(info: "Mapping[str, Any]") -> None:
+    """
+    Renderiza um painel compacto com:
+      - Card de título
+      - Resumo (top 20 do 'summary', se existir)
+      - Totais de colunas codificadas/escaladas e diretório de artefatos (se houver)
+    """
+    from IPython.display import display, HTML
+    import pandas as pd
+
+    def _card(title: str, subtitle: str = "") -> "HTML":
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #3b82f6;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    display(_card("🔢 Codificação & Escalonamento",
+                  "Transforma categóricas em numéricas e normaliza variáveis contínuas"))
+
+    summary = info.get("summary", None)
+    if isinstance(summary, pd.DataFrame) and not summary.empty:
+        display(HTML("<b>📊 Resumo (top 20):</b>"))
+        display(summary.head(20))
+
+    enc_cols = list(info.get("encoded_cols") or [])
+    scl_cols = list(info.get("scaled_cols") or [])
+    artifacts = info.get("artifacts_dir", None)
+
+    # Mensagens finais compactas
+    msg = f"✅ Codificação aplicada em {len(enc_cols)} colunas | Escalonamento aplicado em {len(scl_cols)} colunas."
+    display(HTML(f"<div style='margin-top:6px;color:#111827'>{msg}</div>"))
+    if artifacts:
+        display(HTML(f"<div style='color:#6b7280;font-size:12px'>🗂️ Artefatos salvos em: {artifacts}</div>"))
+
+# === Target · Orquestração + Renderização ================================
+
+def run_target_creation_and_summary(df: "pd.DataFrame",
+                                    config: "Mapping[str, Any]",
+                                    verbose: bool = True) -> "dict[str, Any]":
+    """
+    Orquestra a criação/validação do target usando ensure_target_from_config,
+    e retorna um pacote de infos pronto para renderização.
+
+    Retorna um dict com:
+      - df: DataFrame (possivelmente atualizado)
+      - target_name: str
+      - class_map: dict com 'positive' e 'negative'
+      - tgt_report: DataFrame (status, source, positive, negative)
+      - counts: dict {classe: contagem}
+      - total: int
+      - pos_rate: float em [0,1]
+      - status: str
+      - source: str
+    """
+    df_out, target_name, class_map, tgt_report = ensure_target_from_config(
+        df, config, verbose=verbose
+    )
+
+    # Extrai metadados do relatório (se existir)
+    status = None
+    source = None
+    try:
+        if tgt_report is not None and len(tgt_report) > 0:
+            status = str(tgt_report.loc[0, "status"])
+            source = str(tgt_report.loc[0, "source"])
+    except Exception:
+        pass
+
+    # Contagens e taxa positiva
+    import pandas as pd
+    vc = df_out[target_name].value_counts(dropna=False)
+    total = int(vc.sum())
+    pos_label = (class_map or {}).get("positive", "yes")
+    neg_label = (class_map or {}).get("negative", "no")
+    pos = int(vc.get(pos_label, 0))
+    neg = int(vc.get(neg_label, 0))
+    pos_rate = (pos / total) if total else 0.0
+
+    return {
+        "df": df_out,
+        "target_name": target_name,
+        "class_map": class_map,
+        "tgt_report": tgt_report,
+        "counts": {k: int(v) for k, v in vc.to_dict().items()},
+        "total": total,
+        "pos_rate": pos_rate,
+        "status": status,
+        "source": source,
+        "pos_label": pos_label,
+        "neg_label": neg_label,
+    }
+
+
+def render_target_summary(info: "Mapping[str, Any]") -> None:
+    """
+    Renderiza um painel compacto e padronizado para a variável-alvo:
+    - Card com status e fonte
+    - Tabela de contagens e percentuais
+    - Badge com taxa positiva e classes detectadas
+    - Alerta de desbalanceamento extremo (opcional)
+    """
+    from IPython.display import display, HTML
+    import pandas as pd
+
+    def _card(title: str, subtitle: str = "") -> "HTML":
+        return HTML(f"""
+        <div style="border:1px solid #e5e7eb;border-left:6px solid #7c3aed;
+                    border-radius:10px;padding:12px 14px;margin:12px 0;background:#fafafa">
+          <div style="font-weight:700;font-size:16px">{title}</div>
+          <div style="color:#6b7280;font-size:12px;margin-top:2px">{subtitle}</div>
+        </div>
+        """)
+
+    tname = info.get("target_name", "target")
+    status = info.get("status") or "—"
+    source = info.get("source") or "—"
+    pos_label = info.get("pos_label", "yes")
+    neg_label = info.get("neg_label", "no")
+    total = int(info.get("total", 0))
+    pos_rate = float(info.get("pos_rate", 0.0))
+
+    # Card topo
+    display(_card("🎯 Variável-Alvo (target)",
+                  f"Nome: <b>{tname}</b> • Status: <b>{status}</b> • Fonte: <b>{source}</b>"))
+
+    # Tabela de contagens
+    counts = info.get("counts", {}) or {}
+    neg = int(counts.get(neg_label, 0))
+    pos = int(counts.get(pos_label, 0))
+
+    tbl = pd.DataFrame([
+        {"classe": neg_label, "contagem": neg, "percentual": f"{(neg/total):.2%}" if total else "—"},
+        {"classe": pos_label, "contagem": pos, "percentual": f"{(pos/total):.2%}" if total else "—"},
+        {"classe": "TOTAL",   "contagem": total, "percentual": "100.00%" if total else "—"},
+    ])
+    display(tbl)
+
+    # Badge e classes detectadas
+    classes_list = list(counts.keys())
+    display(HTML(f"""
+    <div style="margin-top:8px;font-size:13px;color:#374151">
+      <b>Taxa de {pos_label}:</b> {pos_rate:.2%} • 
+      <b>Classes detectadas:</b> {classes_list}
+    </div>
+    """))
+
+    # Alerta de desbalanceamento extremo
+    if total and (pos_rate < 0.10 or pos_rate > 0.90):
+        display(HTML(
+            "<div style='color:#b91c1c;font-size:12px;margin-top:6px'>"
+            "⚠️ Alvo fortemente desbalanceado — considere reamostragem/ponderação no N2."
+            "</div>"
+        ))
+
+
+def normalize_target_labels_inplace(df, target_name, positive_aliases=None, negative_aliases=None):
+    """
+    Normaliza in-place os rótulos do target para 'yes'/'no' a partir de aliases comuns.
+    """
+    import pandas as pd
+
+    if target_name not in df.columns:
+        return
+
+    s = df[target_name]
+
+    pos_alias = set(map(str, (positive_aliases or {
+        "yes","y","true","1","sim","positivo","pos","churn","churned"
+    })))
+    neg_alias = set(map(str, (negative_aliases or {
+        "no","n","false","0","nao","não","negativo","neg","retained","stay"
+    })))
+
+    s_norm = s.astype(str).str.strip().str.lower()
+
+    # tenta mapear direto
+    mapped = s_norm.where(~s_norm.isin(pos_alias | neg_alias))
+    mapped = mapped.mask(s_norm.isin(pos_alias), "yes")
+    mapped = mapped.mask(s_norm.isin(neg_alias), "no")
+
+    # tenta mapear booleanos/numéricos residuais
+    mapped = mapped.fillna(
+        s_norm.map({
+            "1": "yes", "0": "no",
+            "true": "yes", "false": "no"
+        })
+    )
+
+    df[target_name] = mapped
+
+
+def fix_target_then_summary(df, config, verbose=True):
+    """
+    Envolve ensure_target_from_config e, se as classes não forem reconhecidas,
+    normaliza labels e tenta novamente.
+    """
+    df1, tname, cmap, rep = ensure_target_from_config(df, config, verbose=verbose)
+
+    vc = df1[tname].value_counts(dropna=False)
+    # se counts vazias para 'yes' e 'no', tenta normalizar e refazer o resumo
+    need_fix = (("yes" not in vc.index) and ("no" not in vc.index)) or vc.sum() == 0
+
+    if need_fix:
+        normalize_target_labels_inplace(df1, tname)
+    return run_target_creation_and_summary(df1, config, verbose=verbose)

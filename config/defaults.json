@@ -71,5 +71,16 @@
   "class_map": {
     "Yes": 1,
     "No": 0
+  },
+  "encoding": {
+    "enabled": true,
+    "strategy": "onehot",
+    "drop_first": false,
+    "exclude": ["Churn", "customerID"]
+  },
+  "scaling": {
+    "enabled": false,
+    "strategy": "standard",
+    "exclude": ["Churn"]
   }
 }

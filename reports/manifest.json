@@ -1247,6 +1247,1630 @@
         "config": {}
       },
       "timestamp": "2025-11-09T11:00:46"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T11:15:55"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T11:15:55"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T11:15:55"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T11:31:09"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 17
+      },
+      "timestamp": "2025-11-09T11:31:09"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T11:31:09"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T11:31:32"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 17
+      },
+      "timestamp": "2025-11-09T11:31:32"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T11:31:32"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T11:37:59"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T15:24:24"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T15:24:24"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T15:24:24"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T15:24:27"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 17
+      },
+      "timestamp": "2025-11-09T15:24:27"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T15:24:27"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T15:26:37"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T15:26:37"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T15:48:59"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T15:49:00"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T15:49:00"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T15:51:14"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T15:51:14"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T16:06:57"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T16:06:57"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T16:27:00"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T16:27:00"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T16:27:09"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T16:27:09"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T16:27:32"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T16:27:32"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T16:40:05"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 63
+      },
+      "timestamp": "2025-11-09T16:40:05"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 63
+      },
+      "timestamp": "2025-11-09T16:40:46"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 84
+      },
+      "timestamp": "2025-11-09T16:40:47"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 84
+      },
+      "timestamp": "2025-11-09T16:49:41"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 105
+      },
+      "timestamp": "2025-11-09T16:49:41"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T18:13:45"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T18:13:45"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T18:13:45"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T18:13:48"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T18:13:48"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T18:13:50"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T18:13:50"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T18:23:18"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T18:23:18"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T18:23:23"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T18:28:42"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T18:43:18"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T19:15:42"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T19:15:42"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 51
+      },
+      "timestamp": "2025-11-09T19:15:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 60
+      },
+      "timestamp": "2025-11-09T19:15:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 8
+      },
+      "timestamp": "2025-11-09T19:15:49"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T19:18:36"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T19:23:39"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T19:23:39"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T19:23:39"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T19:23:43"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T19:23:43"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T19:23:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T19:23:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T19:23:46"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T19:23:50"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T19:25:12"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T19:25:12"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T19:25:12"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T19:25:15"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T19:25:15"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T19:25:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T19:25:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T19:25:18"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T19:25:21"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T19:32:01"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T20:06:11"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T20:06:11"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T20:06:11"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T20:06:13"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T20:06:13"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T20:06:14"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T20:06:14"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T20:06:15"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T20:06:18"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T20:41:40"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T20:41:40"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T20:41:40"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T20:41:41"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T20:41:41"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T20:41:41"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T20:41:41"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T20:41:42"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T20:41:43"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T22:50:57"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T22:50:57"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T22:50:58"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T22:50:59"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T22:50:59"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T22:50:59"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T22:50:59"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T22:50:59"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T22:51:00"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T22:52:27"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T22:52:27"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T22:52:27"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T22:52:31"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T22:52:31"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T22:52:32"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T22:52:32"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T22:52:38"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T22:52:41"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:01:56"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T23:01:57"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:01:57"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:01:58"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:01:58"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T23:01:58"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T23:01:58"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T23:01:58"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T23:02:00"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:04:25"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T23:04:25"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:04:25"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:04:26"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:04:26"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T23:04:26"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T23:04:26"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T23:04:26"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T23:04:26"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:17:37"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T23:17:37"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:17:37"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:17:38"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:17:38"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T23:17:38"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T23:17:38"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T23:17:38"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T23:17:38"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:18:15"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T23:18:15"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:18:15"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:18:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:18:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T23:18:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T23:18:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T23:18:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T23:18:16"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:19:43"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-09T23:19:43"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-09T23:19:43"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:19:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-09T23:19:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-09T23:19:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-09T23:19:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-09T23:19:44"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-09T23:19:44"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T04:42:19"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-10T04:42:19"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T04:42:19"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T04:42:20"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T04:42:20"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-10T04:42:21"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-10T04:42:21"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-10T04:42:22"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-10T04:42:24"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T05:28:14"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-10T05:28:14"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T05:28:14"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T05:28:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T05:28:16"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-10T05:28:17"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-10T05:28:17"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-10T05:28:19"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-10T05:28:22"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T05:53:50"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-10T05:53:50"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T05:53:50"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T05:53:53"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T05:53:53"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-10T05:53:54"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-10T05:53:54"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-10T05:53:56"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-10T05:53:59"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T06:05:55"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-10T06:05:55"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T06:05:55"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T06:05:56"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T06:05:56"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-10T06:05:57"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-10T06:05:57"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-10T06:05:58"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-10T06:06:01"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T08:38:59"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-10T08:38:59"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T08:38:59"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T08:39:02"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T08:39:02"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-10T08:39:04"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-10T08:39:04"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-10T08:39:05"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-10T08:39:09"
+    },
+    {
+      "step": "n1_quality_typing:start",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T17:56:08"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cast_report.csv",
+        "rows": 18
+      },
+      "timestamp": "2025-11-10T17:56:08"
+    },
+    {
+      "step": "n1_quality_typing:end",
+      "details": {
+        "config": {}
+      },
+      "timestamp": "2025-11-10T17:56:08"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T17:56:10"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\cat_normalization.csv",
+        "rows": 16
+      },
+      "timestamp": "2025-11-10T17:56:10"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\before.csv",
+        "rows": 21
+      },
+      "timestamp": "2025-11-10T17:56:12"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\missing\\after.csv",
+        "rows": 42
+      },
+      "timestamp": "2025-11-10T17:56:12"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\outliers\\summary.csv",
+        "rows": 3
+      },
+      "timestamp": "2025-11-10T17:56:14"
+    },
+    {
+      "step": "save_report_df",
+      "details": {
+        "path": "C:\\Users\\fabio\\Projetos DEV\\data projects\\telco-customer-churn-analysis\\reports\\date_parse_report.csv",
+        "rows": 0
+      },
+      "timestamp": "2025-11-10T17:56:17"
     }
   ]
 }
