@@ -82,5 +82,14 @@
     "enabled": false,
     "strategy": "standard",
     "exclude": ["Churn"]
+  },
+  "null_fill_with_flag": {
+    "enabled": true,
+    "numeric_fill": 0,
+    "categorical_fill": "__MISSING__",
+    "cols_numeric_zero": ["TotalCharges", "avg_charge_per_month"],
+    "flag_suffix": "_was_missing",
+    "report_relpath": "nulls/fill_summary.csv"
   }
+
 }

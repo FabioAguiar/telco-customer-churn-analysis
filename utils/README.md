@@ -1,214 +1,141 @@
-# 🧰 `utils/` — Utility Toolkit for Data Projects (v1.2.2-merged)
+# 🧰 utils_data.py — Toolkit de Funções Utilitárias para Projetos de Dados
 
-Coleção de utilitários usada pelos notebooks (N1→N3) para **ingestão**, **limpeza**, **engenharia de atributos**, **datas**, **texto**, **codificação/escala**, **catálogo de DataFrames**, **artefatos** e **manifest**.  
-Módulo principal: **`utils/utils_data.py`** (versão `UTILS_DATA_VERSION = "1.2.2"`).
-
-> Import típico no notebook:
-> ```python
-> import importlib, utils.utils_data as ud
-> importlib.reload(ud)
-> from utils.utils_data import TableStore
-> ```
+Este módulo centraliza funções reutilizáveis para **ingestão, limpeza, transformação, engenharia de atributos, tratamento de nulos, exportação e controle de artefatos**.
+É o núcleo do *Data Project Template* e garante **reprodutibilidade, modularidade e clareza** em todos os notebooks (N1, N2 e N3).
 
 ---
 
-## 🧭 Descoberta de raiz, config e manifest
+## 📦 Estrutura Geral
 
-### `ensure_project_root() -> Path`
-- Sobe a árvore até encontrar `config/defaults.json` e fixa a **raiz do projeto**.
-- Injeta `utils/` no `sys.path` (para imports estáveis nos notebooks em qualquer subpasta).
-- Emite log: `PROJECT_ROOT: <path>`.
-
-### `load_config(base_abs=None, local_abs=None) -> dict`
-- Carrega `config/defaults.json` e faz *merge* profundo com `config/local.json` (se existir).
-
-### Manifest helpers
-- `load_manifest()`, `save_manifest()`, `update_manifest()`
-- `record_step(name, details=None)` e *context manager* `with_step(name, details=None)` para auditar etapas no tempo.
-
-### Artefatos e relatórios
-- `get_artifacts_dir(subdir=None)` → **`reports/artifacts[/<subdir>]`** (garante diretório). **Use isto no N1**.
-- `save_artifact(obj, name)` / `load_artifact(name)` → `.joblib` em `artifacts/` (modelos, encoders, etc.).
-- `save_report_df(df, rel_path)` e `save_text(text, rel_path)` gravam em `reports/<rel_path>`.
+| Categoria | Funções Principais |
+|------------|--------------------|
+| 🔧 Configuração e Caminhos | `get_project_root`, `load_config`, `ensure_dirs`, `discover_processed_path` |
+| 🧹 Qualidade e Tipagem | `run_quality_and_typing`, `render_quality_and_typing` |
+| ⚠️ Tratamento de Nulos | `null_fill_from_config`, `render_null_fill_report` |
+| 📈 Engenharia de Atributos | `_safe_div`, `_signed_log1p`, `recompute_charge_gap_features`, `recompute_avg_charge_safe` |
+| 📊 Métricas e Avaliação | `compute_metrics`, `try_plot_roc` |
+| 🧾 Persistência e Exportação | `persist_artifacts`, `save_report_df`, `ensure_project_root` |
 
 ---
 
-## 📥 Ingestão & 📤 Exportação
+## ⚙️ 1. Configuração e Caminhos
 
-- `infer_format_from_suffix(path) -> "csv"|"parquet"`
-- `load_csv(path, **kwargs)` → wrapper do `pd.read_csv`
-- `load_table_simple(path, fmt=None, *args, **kwargs)`  
-  Compatível com: `fmt` **ou** dicionário de `read_opts` posicional.
-- `save_table(df, path, fmt=None, **kwargs)` → respeita a extensão (`.csv`/`.parquet`), cria pastas e loga.
-- `list_directory_files(dir)` e `suggest_source_path(dir, pattern="*.csv")` → inventário rápido de fontes.
-- `save_named_interims({name: df}, base_dir, fmt="parquet")` → salva múltiplos *interims* nomeados.
+### `get_project_root()`  
+Localiza automaticamente a raiz do projeto com base no arquivo `config/defaults.json`.  
+Utilizado por todos os notebooks para referência de diretórios.
 
----
+### `load_config(defaults_path, local_path=None)`  
+Carrega o arquivo `defaults.json` e o opcional `local.json`, realizando *merge* com prioridade para o local.  
+Retorna um dicionário de configurações consolidadas.
 
-## 🔎 Perfil, tipagem & qualidade
+### `ensure_dirs(config)`  
+Garante a existência dos diretórios principais: `artifacts`, `reports` e `models`.  
+Retorna suas referências como `Path`.
 
-- `basic_overview(df) -> dict` → shape, dtypes, memória (MB).
-- `strip_whitespace(df, cols=None)` → *trim* + colapso de espaços para textos.
-- `infer_numeric_like(df, cols=None, decimal=".", thousands=None, report_path="cast_report.csv") -> (df, report)`  
-  Converte “strings numéricas” para números e **persiste relatório** em `reports/` (via `save_report_df`).
-- `n1_quality_typing(df, config)` / `n1_quality_typing_dict(df, config)` → *pipeline* compacto com logs.
-
-### Faltantes, duplicatas e outliers
-- `missing_report(df)` → tabela com `missing_count`/`missing_pct`.
-- `simple_impute_with_flags(df, strategy="median") -> (df, meta)` → flags `was_missing` por coluna (rastreável).
-- `deduplicate_rows(df, subset=None, keep="first", config=None) -> df`  
-  **Nova** assinatura lê `config["deduplicate"]` (subset/keep) se passado.
-- `apply_outlier_flags(df, config=None, method=None, iqr_factor=None, z_threshold=None, ...) -> (df, info)`  
-  **Nova** API que cria colunas `<col>_is_outlier` por **IQR** ou **Z-score**, respeitando `config["outliers"]`  
-  (cols, exclude_cols, exclude_binaries, iqr_factor, z_threshold) e pode **persistir** resumo em `reports/outliers/summary.csv`.
+### `discover_processed_path(config)`  
+Retorna o caminho completo do arquivo processado (gerado no N1) com base nas chaves do `config`.
 
 ---
 
-## 🔤 Categóricas & 🔢 Numéricas
+## 🧹 2. Qualidade e Tipagem
 
-- `encode_categories(df, cols=None, drop_first=False, high_cardinality_threshold=20, top_k=None, other_label="__OTHER__") -> (df, meta)`
-- `encode_categories_safe(df, exclude_cols=None, **kwargs)` → ignora alvo/IDs e protege contra alta cardinalidade.
-- `scale_numeric(df, method="standard"|"minmax", cols=None) -> (df, meta)`
-- `scale_numeric_safe(df, exclude_cols=None, only_continuous=True, **kwargs)` → evita dummies/booleanas.
-- `apply_encoding_and_scaling(df, config) -> (df, meta)` → orquestra encode→scale lendo sub-`config` (`encoding`/`scaling`).
+### `run_quality_and_typing(df, config)`  
+Executa padronização e coerção de tipos, incluindo:
+- Conversão numérica e categórica;
+- Normalização de capitalização e espaços;
+- Deduplicação condicional;
+- Registro de estatísticas de memória e tipos.
 
----
-
-## 📅 Datas
-
-- `detect_date_candidates(df, regex_list=None)`
-- `parse_dates_with_report(df, cols=None, dayfirst=False, utc=False, errors="coerce", min_ratio=0.6, report_path="date_parse_report.csv") -> (df, report)`
-- **Nova:** `parse_dates_with_report_cfg(df, cfg) -> (df, report, parsed_cols)`  
-  Lê um dicionário `cfg` com: `detect_regex`, `explicit_cols`, `dayfirst`, `utc`, `formats`, `min_ratio`, `report_path`.
-- `expand_date_features(df, cols)` → `*_year`, `*_month`, `*_day`, `*_dow`, `*_week`, `*_quarter`.
-- **Nova:** `expand_date_features_plus(df, date_cols, features=("year","month","day","dayofweek","quarter","week","is_month_start","is_month_end"), prefix_mode="auto") -> list[str]`
-- `build_calendar_from(df, col, freq="D") -> dim_date`
+### `render_quality_and_typing(result)`  
+Renderiza o resumo visual da etapa de qualidade: dimensões, memória e conversões aplicadas.
 
 ---
 
-## 📝 Texto
+## ⚠️ 3. Tratamento de Nulos
 
-- **Nova (ampliada):** `extract_text_features(df, *, lower=True, strip_collapse_ws=True, keywords=None, blacklist=None, export_summary=True, summary_dir=None) -> (df, summary_df)`  
-  - Limpeza leve (minúsculas/opcional e espaços).  
-  - Métricas: `<col>_len`, `<col>_word_count`.  
-  - Flags por *keywords*: `<col>_has_<kw>`.  
-  - Exporta `text_features_summary.csv` quando configurado.
+### `null_fill_from_config(df, config, root=None)`  
+Preenche valores nulos com base nas opções do bloco `null_fill_with_flag` do `config`.  
+Principais parâmetros:
+- `enabled`: ativa/desativa o preenchimento;
+- `numeric_fill`: valor de substituição para colunas numéricas;
+- `categorical_fill`: valor de substituição para colunas categóricas;
+- `cols_numeric_zero`: lista explícita de colunas a preencher com zero;
+- `flag_suffix`: sufixo de flag para indicar valores substituídos;
+- `report_relpath`: caminho relativo do relatório de comparação.
 
----
+Retorna:  
+`(df_preenchido, metadados)` com informações sobre flags, colunas tratadas e caminhos de relatório.
 
-## 🎯 Target
-
-- `build_target(df, config) -> (df, meta)` → regra simples com `col`/`op`/`value` (uso pontual).
-- `ensure_target_from_config(df, config, verbose=False) -> (df, target_name, class_map, report_df)`  
-  Lê `config["target"] = {name, source, positive, negative}`.  
-  - Se `name` já existir no DF → **respeita**.  
-  - Se `source` existir → cria `name` mapeando `positive`/`negative`.  
-  - Caso contrário → cria `name` nulo e reporta **não criado**.  
-  - `class_map` persistível via `globals()["class_map"] = class_map` (usado no N1 para alimentar `meta.json`).
-
----
-
-## 📚 Catálogo: `TableStore`
-
-Mini-catálogo para múltiplos DataFrames nomeados com *current*:
-```python
-T = TableStore(initial={"main": df}, current="main")
-T.add("features_v1", df2, set_current=True)
-df = T.get()         # pega o current
-df_raw = T["main"]   # dict-like
-display(T.list())    # inventário com memória
-```
+### `render_null_fill_report(meta)`  
+Exibe um relatório claro e colorido com:
+- Colunas preenchidas;
+- Flags criadas;
+- Caminho de relatório salvo;
+- Tabelas “antes” e “depois” do preenchimento.
 
 ---
 
-## 🧪 Exemplos (copiar-e-colar)
+## 📈 4. Engenharia de Atributos (Feature Engineering)
 
-### 1) Datas com cfg + features
-```python
-df, rep, parsed = ud.parse_dates_with_report_cfg(
-    df,
-    {"detect_regex": r"(date|data|_at$|_date$)", "min_ratio": 0.8, "dayfirst": False}
-)
-created = ud.expand_date_features_plus(df, parsed, features=("year","month","week","is_month_end"))
-```
+### `_safe_div(num, den, fallback=0.0)`  
+Divisão protegida contra divisão por zero e `NaN`.  
+Usada internamente em razões como `TotalCharges / tenure`.
 
-### 2) Outliers com persistência de resumo
-```python
-df, out_info = ud.apply_outlier_flags(df, config)
-# out_info["persisted"] → {'report_relpath': 'outliers/summary.csv', 'rows': ...} quando habilitado
-```
+### `_signed_log1p(x)`  
+Cálculo de log1p assinado (`sign(x) * log1p(|x|)`) — evita NaN de domínio para valores ≤ -1.  
+Empregado em `charge_gap_log1p` e outras transformações logarítmicas.
 
-### 3) Texto com keywords e blacklist
-```python
-df, txt_sum = ud.extract_text_features(
-    df, keywords=["error","cancel","premium"], blacklist=["customerID"],
-    export_summary=True, summary_dir=ud.get_artifacts_dir("text_features")
-)
-```
+### `recompute_charge_gap_features(df)`  
+Recalcula as colunas derivadas:
+- `charge_gap = TotalCharges - (MonthlyCharges * tenure)`  
+- `charge_gap_log1p = sign(charge_gap) * log1p(|charge_gap|)`  
 
-### 4) Encode & Scale seguras
-```python
-ENC = {"exclude_cols": ["Churn","customerID"], "high_cardinality_threshold": 50}
-SCL = {"exclude_cols": ["Churn"], "method": "standard"}
-df_enc, meta = ud.apply_encoding_and_scaling(df, {"encoding": ENC, "scaling": SCL})
-```
+Evita valores nulos e mantém consistência com colunas base após preenchimentos.
 
-### 5) Exportações com caminho relativo à raiz
-```python
-root = ud.ensure_project_root()
-ud.save_report_df(df.head(10), "quick/preview.csv", root=root)  # → reports/quick/preview.csv
-art_dir = ud.get_artifacts_dir("export")                       # → reports/artifacts/export
-```
+### `recompute_avg_charge_safe(df)`  
+Recalcula `avg_charge_per_month` com segurança:  
+- Se `tenure > 0`: calcula `TotalCharges / tenure`;  
+- Se `tenure == 0`: retorna `0` e opcionalmente marca flag `_was_missing`.
 
 ---
 
-## 🔖 Convenções e Logs
+## 📊 5. Métricas e Avaliação
 
-- Sufixos de auditoria: `_is_outlier`, `was_missing`, `<col>_num`, `<col>_has_<kw>`.
-- Logs via `logger` do módulo (`reports/data_preparation.log` quando configurado no notebook).
+### `compute_metrics(y_true, y_pred)`  
+Gera dicionário de métricas: acurácia, F1-score, precisão, recall e matriz de confusão.
 
----
-
-## ✅ Dependências
-
-- `pandas`, `numpy`
-- `scikit-learn` (para encode/scale e imputações avançadas)
-- Python ≥ 3.10 recomendado
-- (Opcional) `joblib` para artefatos; `weasyprint`/`pandoc` para `md_to_pdf`.
+### `try_plot_roc(model, X_test, y_test)`  
+Tenta exibir a curva ROC (Receiver Operating Characteristic) de forma segura e padronizada.
 
 ---
 
-## 🔁 Compatibilidade Retroativa
+## 🧾 6. Persistência e Exportação
 
-Este módulo mantém **aliases e assinaturas compatíveis** com versões anteriores:
-- `resolve_n1_paths()` aceita chamadas antigas (com/sem `config`).
-- `TableStore` preserva métodos (`add/get/use/list`) e acesso `dict-like`.
-- `load_table_simple` aceita `fmt` **ou** o `read_opts` via *args*.
+### `persist_artifacts(df, config)`  
+Exporta o dataframe processado, artefatos e metadados para os diretórios definidos em `config`.
 
----
+### `save_report_df(df, relpath, root=None)`  
+Salva qualquer dataframe de relatório (como comparativo de nulos ou metadados) no diretório `reports/`.
 
-## 📌 Dicas de uso no N1
-
-- Use `ud.get_artifacts_dir("<subdir>")` para **todas** as saídas auxiliares do N1 (ex.: `export`, `text_features`, `calendar`, `outliers`).  
-- Garanta a *seed* global cedo com `ud.set_random_seed(seed)` (ou defina `RANDOM_SEED` pelo `config`).  
-- Ao criar o **target**, propague `class_map` para o `meta.json` e para o N2.
+### `ensure_project_root()`  
+Valida a estrutura de diretórios do projeto e cria o `__init__.py` em `utils/` se ausente.
 
 ---
 
-## 🧾 Exportações (API)
+## 🧠 7. Integração entre Etapas (N1 → N2 → N3)
 
-Principais nomes expostos via `__all__`:  
-`ensure_project_root`, `load_config`, `load_manifest`, `save_manifest`, `update_manifest`, `record_step`, `with_step`,  
-`save_artifact`, `load_artifact`, `save_report_df`, `save_text`,  
-`N1Paths`, `resolve_n1_paths`, `path_of`,  
-`list_directory_files`, `infer_format_from_suffix`, `load_csv`, `load_table_simple`, `save_table`, `suggest_source_path`,  
-`strip_whitespace`, `infer_numeric_like`, `n1_quality_typing`, `n1_quality_typing_dict`,  
-`simple_impute_with_flags`, `deduplicate_rows`, `detect_outliers_iqr`, `detect_outliers_zscore`, `apply_outlier_flags`,  
-`normalize_categories`, `encode_categories`, `encode_categories_safe`, `scale_numeric`, `scale_numeric_safe`, `apply_encoding_and_scaling`,  
-`detect_date_candidates`, `parse_dates_with_report`, `parse_dates_with_report_cfg`, `expand_date_features`, `expand_date_features_plus`, `build_calendar_from`,  
-`extract_text_features`,  
-`build_target`, `ensure_target_from_config`,  
-`TableStore`, `basic_overview`, `missing_report`, `merge_chain`,  
-`generate_human_report_md`, `md_to_pdf`,  
-`set_random_seed`, `set_display`,  
-`UTILS_DATA_VERSION`.
+O módulo `utils_data.py` foi projetado para conectar cada fase do projeto de dados:
+
+| Fase | Funções-Chave |
+|------|----------------|
+| N1 - Preparação | `run_quality_and_typing`, `null_fill_from_config`, `recompute_charge_gap_features`, `recompute_avg_charge_safe` |
+| N2 - Modelagem | `discover_processed_path`, `compute_metrics`, `try_plot_roc` |
+| N3 - Análise | `load_config`, `persist_artifacts`, `save_report_df` |
+
+---
+
+## 🧩 Versão e Autoria
+
+**Versão:** 1.3.0  
+**Autor:** Fábio Emmanuel de Andrade Aguiar (Fabyuu)  
+**Descrição:** Toolkit unificado e resiliente para pipelines de dados, desenvolvido para o projeto *Telco Customer Churn Analysis* e o *Data Project Template* genérico.

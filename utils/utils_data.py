@@ -3912,3 +3912,321 @@ def fix_target_then_summary(df, config, verbose=True):
     if need_fix:
         normalize_target_labels_inplace(df1, tname)
     return run_target_creation_and_summary(df1, config, verbose=verbose)
+
+# =============================================================================
+# 🔧 Null handling com flag (aditivo e retro-compatível)
+# =============================================================================
+from typing import Optional, Sequence, Mapping, Tuple, Dict, Any
+import pandas as _pd
+import numpy as _np
+
+def summarize_missing(df: _pd.DataFrame) -> _pd.DataFrame:
+    """
+    Retorna um resumo de valores nulos por coluna:
+      column | missing_count | missing_pct | dtype
+    """
+    total = len(df)
+    if total == 0:
+        return _pd.DataFrame(columns=["column","missing_count","missing_pct","dtype"])
+    miss = df.isna().sum().rename("missing_count").to_frame()
+    miss["missing_pct"] = (miss["missing_count"] / total * 100).round(2)
+    miss["column"] = miss.index
+    miss["dtype"] = [str(df[c].dtype) for c in miss["column"]]
+    miss = miss.loc[miss["missing_count"] > 0, ["column","missing_count","missing_pct","dtype"]]
+    return miss.reset_index(drop=True)
+
+
+def null_fill_with_flag(
+    df: _pd.DataFrame,
+    cols: Optional[Sequence[str]] = None,
+    numeric_fill: float | int = 0,
+    categorical_fill: str = "__MISSING__",
+    flag_suffix: str = "_was_missing",
+) -> Tuple[_pd.DataFrame, Dict[str, Any]]:
+    """
+    Preenche nulos nas colunas indicadas e cria flags <col>_was_missing (0/1).
+    - Colunas numéricas recebem `numeric_fill`;
+    - Colunas não-numéricas recebem `categorical_fill`.
+
+    Retorna: (df_novo, meta)
+      meta = {
+        "filled_cols": [...],
+        "flags_created": N,
+        "before_summary": DataFrame,
+        "after_summary": DataFrame
+      }
+    """
+    out = df.copy()
+    before = summarize_missing(out)
+
+    if cols is None:
+        cols = [c for c in out.columns if out[c].isna().any()]
+
+    flags_created = 0
+    filled_cols: list[str] = []
+
+    for c in cols:
+        if c not in out.columns:
+            continue
+        s = out[c]
+        mask = s.isna()
+        if not mask.any():
+            continue
+
+        # cria flag
+        flag_col = f"{c}{flag_suffix}"
+        out[flag_col] = mask.astype(int)
+        flags_created += 1
+
+        # aplica preenchimento conforme dtype
+        if _pd.api.types.is_numeric_dtype(s):
+            out[c] = s.fillna(numeric_fill)
+        else:
+            out[c] = s.fillna(categorical_fill)
+
+        filled_cols.append(c)
+
+    after = summarize_missing(out)
+    meta: Dict[str, Any] = {
+        "filled_cols": filled_cols,
+        "flags_created": flags_created,
+        "before_summary": before,
+        "after_summary": after,
+    }
+    return out, meta
+
+
+def null_fill_from_config(
+    df: _pd.DataFrame,
+    config: Mapping[str, Any],
+    root: Optional[Path] = None
+) -> Tuple[_pd.DataFrame, Dict[str, Any]]:
+    """
+    Lê config["null_fill_with_flag"] (se existir e enabled) e aplica null_fill_with_flag.
+    Exemplo de config (defaults.json):
+      "null_fill_with_flag": {
+        "enabled": true,
+        "numeric_fill": 0,
+        "categorical_fill": "__MISSING__",
+        "cols_numeric_zero": ["avg_charge_per_month"],
+        "flag_suffix": "_was_missing",
+        "report_relpath": "nulls/fill_summary.csv"
+      }
+
+    Retorna: (df, meta). Se o recurso estiver desabilitado/ausente, retorna df inalterado e meta vazio.
+    """
+    spec = (config or {}).get("null_fill_with_flag")
+    if not spec or not bool(spec.get("enabled", False)):
+        return df, {"enabled": False}
+
+    numeric_fill = spec.get("numeric_fill", 0)
+    categorical_fill = spec.get("categorical_fill", "__MISSING__")
+    flag_suffix = spec.get("flag_suffix", "_was_missing")
+    report_relpath = spec.get("report_relpath", "nulls/fill_summary.csv")
+
+    # Se cols não vieram, aplicamos somente nas que têm nulos
+    cols = spec.get("cols_numeric_zero") or spec.get("cols")  # compat
+    if cols is None:
+        cols = [c for c in df.columns if df[c].isna().any()]
+
+    df2, meta = null_fill_with_flag(
+        df,
+        cols=cols,
+        numeric_fill=numeric_fill,
+        categorical_fill=categorical_fill,
+        flag_suffix=flag_suffix,
+    )
+    meta["enabled"] = True
+
+    # Persiste um resumo (antes/depois) em reports, se disponível infra de reports
+    try:
+        before = meta.get("before_summary")
+        after = meta.get("after_summary")
+        # monta um comparativo simples
+        if isinstance(before, _pd.DataFrame) and isinstance(after, _pd.DataFrame):
+            comp = before.merge(after, on=["column","dtype"], how="outer", suffixes=("_before","_after"))
+            comp = comp.fillna(0)
+            save_report_df(comp, report_relpath, root=root)
+            meta["report_path"] = str((ensure_project_root() / "reports" / report_relpath).resolve())
+    except Exception as e:
+        logger.warning(f"[null_fill_from_config] falha ao persistir relatório: {e}")
+
+    return df2, meta
+
+
+def render_null_fill_report(meta: Dict[str, Any]) -> None:
+    """
+    Renderiza um card simples com o que foi preenchido e flags criadas.
+    Usa os helpers de card já existentes no utils.
+    """
+    if not isinstance(meta, dict) or not meta.get("enabled", False):
+        display(_card("🟦 Nulos (fill+flag)", "Desabilitado por configuração"))
+        return
+
+    title = "🟦 Nulos (fill+flag)"
+    subtitle = "Preenchimento de nulos com colunas de flag"
+    display(_card(title, subtitle))
+
+    filled_cols = meta.get("filled_cols") or []
+    flags_created = int(meta.get("flags_created", 0))
+    print(f"• Colunas preenchidas: {len(filled_cols)}")
+    if filled_cols:
+        print("  - " + ", ".join(filled_cols[:12]) + (" ..." if len(filled_cols) > 12 else ""))
+    print(f"• Flags criadas      : {flags_created}")
+
+    if meta.get("report_path"):
+        print(f"• Relatório (comparativo antes/depois) salvo em: {meta['report_path']}")
+
+    # Exibe tabelas de antes/depois (se existirem)
+    if isinstance(meta.get("before_summary"), _pd.DataFrame) and not meta["before_summary"].empty:
+        display(_card("Antes do preenchimento", "Resumo de nulos"))
+        display(meta["before_summary"])
+    if isinstance(meta.get("after_summary"), _pd.DataFrame) and not meta["after_summary"].empty:
+        display(_card("Depois do preenchimento", "Resumo de nulos"))
+        display(meta["after_summary"])
+    elif isinstance(meta.get("after_summary"), _pd.DataFrame):
+        display(_card("Depois do preenchimento", "Sem nulos restantes nas colunas tratadas"))
+
+# =============================================================================
+# 🔧 Patches de qualidade: regras derivadas e transformações seguras
+# =============================================================================
+import numpy as _np
+import pandas as _pd
+
+def fix_avg_charge_zero_tenure(
+    df: _pd.DataFrame,
+    avg_col: str = "avg_charge_per_month",
+    tenure_col: str = "tenure",
+    create_flag: bool = True,
+) -> _pd.DataFrame:
+    """
+    Regra derivada: se tenure == 0 e avg_charge_per_month é NaN -> setar 0 e flagar.
+    """
+    if avg_col not in df.columns or tenure_col not in df.columns:
+        return df
+    mask = (df[tenure_col] == 0) & (df[avg_col].isna())
+    if mask.any():
+        if create_flag:
+            flag = f"{avg_col}_was_missing"
+            if flag not in df.columns:
+                df[flag] = 0
+            df.loc[mask, flag] = 1
+        df.loc[mask, avg_col] = 0
+    return df
+
+
+def signed_log1p_series(s: _pd.Series) -> _pd.Series:
+    """
+    Aplica log1p assinado: sign(x) * log1p(|x|) — não gera NaN para x <= -1.
+    Mantém NaN somente onde s é NaN.
+    """
+    a = _np.asarray(s, dtype="float64")
+    out = _np.sign(a) * _np.log1p(_np.abs(a))
+    return _pd.Series(out, index=s.index, name=s.name)
+
+
+def recompute_charge_gap_features(
+    df: _pd.DataFrame,
+    total_col: str = "TotalCharges",
+    monthly_col: str = "MonthlyCharges",
+    tenure_col: str = "tenure",
+    gap_col: str = "charge_gap",
+    gap_log1p_col: str = "charge_gap_log1p",
+) -> _pd.DataFrame:
+    """
+    Recalcula charge_gap = TotalCharges - (MonthlyCharges * tenure)
+    e charge_gap_log1p usando log assinado para evitar NaN de domínio.
+    """
+    missing = [c for c in [total_col, monthly_col, tenure_col] if c not in df.columns]
+    if missing:
+        return df  # silencioso; não existe base para o cálculo
+
+    df[gap_col] = df[total_col] - (df[monthly_col] * df[tenure_col])
+    df[gap_log1p_col] = signed_log1p_series(df[gap_col])
+    return df
+
+
+# -----------------------------------------------------------------------------
+# 🔧 Preenchimento com flag a partir de config — adiciona suporte a lista explícita
+# -----------------------------------------------------------------------------
+def null_fill_from_config(
+    df: _pd.DataFrame,
+    config: dict,
+    root: Path | None = None
+):
+    """
+    Estende o comportamento: se 'cols_numeric_zero' existir, usa essa lista.
+    Se não existir, varre somente colunas com NaN.
+    """
+    spec = (config or {}).get("null_fill_with_flag")
+    if not spec or not bool(spec.get("enabled", False)):
+        return df, {"enabled": False}
+
+    numeric_fill = spec.get("numeric_fill", 0)
+    categorical_fill = spec.get("categorical_fill", "__MISSING__")
+    flag_suffix = spec.get("flag_suffix", "_was_missing")
+    report_relpath = spec.get("report_relpath", "nulls/fill_summary.csv")
+
+    # se a lista vier no config, usamos exatamente ela
+    cols = spec.get("cols_numeric_zero") or spec.get("cols")
+    if cols is None:
+        cols = [c for c in df.columns if df[c].isna().any()]
+
+    df2 = df.copy()
+
+    # --- resumo antes
+    total = len(df2)
+    before = (
+        df2.isna().sum().to_frame("missing_count")
+        .assign(missing_pct=lambda x: (x["missing_count"] / total * 100).round(2))
+        .query("missing_count > 0")
+        .reset_index(names="column")
+    )
+
+    filled_cols = []
+    flags_created = 0
+
+    for c in cols:
+        if c not in df2.columns:
+            continue
+        mask = df2[c].isna()
+        if not mask.any():
+            continue
+        flag_col = f"{c}{flag_suffix}"
+        if flag_col not in df2.columns:
+            df2[flag_col] = 0
+            flags_created += 1
+        df2.loc[mask, flag_col] = 1
+        if _pd.api.types.is_numeric_dtype(df2[c]):
+            df2[c] = df2[c].fillna(numeric_fill)
+        else:
+            df2[c] = df2[c].fillna(categorical_fill)
+        filled_cols.append(c)
+
+    # --- resumo depois
+    after = (
+        df2.isna().sum().to_frame("missing_count")
+        .assign(missing_pct=lambda x: (x["missing_count"] / total * 100).round(2))
+        .query("missing_count > 0")
+        .reset_index(names="column")
+    )
+
+    # tenta salvar relatório via helper do projeto (se existir)
+    try:
+        comp = before.merge(after, on="column", how="outer", suffixes=("_before", "_after")).fillna(0)
+        save_report_df(comp, report_relpath, root=root)  # sua função já existente
+        report_path = str((ensure_project_root() / "reports" / report_relpath).resolve())
+    except Exception:
+        report_path = None
+
+    meta = {
+        "enabled": True,
+        "filled_cols": filled_cols,
+        "flags_created": flags_created,
+        "before_summary": before,
+        "after_summary": after,
+        "report_path": report_path,
+    }
+    return df2, meta
+
+

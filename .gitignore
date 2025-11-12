@@ -28,6 +28,7 @@ htmlcov/
 # ============================================
 .ipynb_checkpoints/
 *.nbconvert.ipynb
+*.ipynb_checkpoints/
 
 # ============================================
 # 💡 IDE / PROJETO
@@ -53,6 +54,7 @@ data/processed/
 !data/.gitkeep
 !data/README.md
 
+# exportações diretas
 processed.parquet
 
 # ============================================
@@ -62,14 +64,24 @@ reports/*.log
 reports/data_preparation.log
 reports/manifest.json
 reports/artifacts/**
+reports/missing/**
+reports/outliers/**
+reports/nulls/**
 !reports/.gitkeep
 !reports/README.md
+
+# logs genéricos e temporários
+*.bak
+*.tmp
+*.old
 
 # ============================================
 # 🧱 ARTEFATOS E METADADOS
 # ============================================
 artifacts/**/*.json
 artifacts/**/*.csv
+artifacts/**/*.xlsx
+artifacts/**/*.parquet
 !artifacts/.gitkeep
 !artifacts/README.md
 
@@ -87,3 +99,25 @@ prints/**
 # 🧾 LOGS GERAIS
 # ============================================
 *.log
+
+# ============================================
+# 🧩 MODELOS / CHECKPOINTS
+# ============================================
+*.joblib
+*.pkl
+*.pickle
+*.sav
+
+# ============================================
+# ⚙️ CONFIGURAÇÕES LOCAIS
+# ============================================
+config/local.json
+
+# ============================================
+# 🧪 TEMPORÁRIOS / BACKUPS
+# ============================================
+~$*
+*_backup.*
+*.bak-*
+*.temp
+*.tmp
