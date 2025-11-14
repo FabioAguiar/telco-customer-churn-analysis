@@ -4230,3 +4230,878 @@ def null_fill_from_config(
     return df2, meta
 
 
+# =============================================================================
+# N2 • Bootstrap compacto + leitura e painel estilizado (aditivo, safe)
+# =============================================================================
+from pathlib import Path as _Path
+from typing import Any as _Any, Dict as _Dict, Tuple as _Tuple
+import json as _json
+import pandas as _pd
+import numpy as _np
+import html as _html
+
+try:
+    # só existe em ambiente notebook
+    from IPython.display import HTML as _HTML, display as _display
+except Exception:
+    _HTML = None
+    def _display(*args, **kwargs):  # fallback para execução não-notebook
+        pass
+
+# ---------- utilidades internas ----------
+def _read_table_auto(_path: _Path) -> _pd.DataFrame:
+    """Leitura robusta para parquet/csv/xlsx."""
+    suf = _path.suffix.lower()
+    if suf in (".parquet", ".pq"):
+        return _pd.read_parquet(_path)
+    if suf == ".csv":
+        return _pd.read_csv(_path)
+    if suf in (".xlsx", ".xls"):
+        return _pd.read_excel(_path)
+    raise ValueError(f"Extensão não suportada: {suf} ({_path})")
+
+def _find_target_case(df: _pd.DataFrame, cfg: dict, fallback: str = "target") -> str:
+    """Encontra a coluna alvo case-insensitive usando config (target.name/target_column)."""
+    name = (cfg.get("target", {}) or {}).get("name", cfg.get("target_column", fallback))
+    name = name or fallback
+    mask = df.columns.str.lower() == str(name).lower()
+    return df.columns[mask][0] if mask.any() else name
+
+def _shorten_path(p: _Path | str, keep_parts: int = 4) -> str:
+    """Abrevia caminho para exibição (…/<tail>)."""
+    p = _Path(p)
+    parts = list(p.parts)
+    if len(parts) <= keep_parts:
+        return str(p)
+    tail = _Path(*parts[-keep_parts:])
+    anchor = p.anchor if p.anchor else ""
+    tail_str = str(tail)
+    if anchor and tail_str.startswith(anchor):
+        tail_str = tail_str[len(anchor):]
+    return f"...{anchor}{tail_str}".replace("\\\\", "\\")
+
+def _styler_hide_index(sty: _pd.io.formats.style.Styler) -> _pd.io.formats.style.Styler:
+    try:
+        return sty.hide(axis="index")  # pandas >= 2
+    except Exception:
+        try:
+            return sty.hide_index()    # pandas < 2
+        except Exception:
+            return sty
+
+def _to_html_table(df: _pd.DataFrame, caption: str | None = None) -> str:
+    sty = (
+        df.style
+        .set_table_attributes('class="tbl"')
+        .set_properties(**{"text-align": "right", "padding": "6px 10px"})
+    )
+    sty = _styler_hide_index(sty)
+    html_tbl = sty.to_html()
+    if caption:
+        html_tbl = f'<div class="tbl-caption">{_html.escape(caption)}</div>' + html_tbl
+    return html_tbl
+
+def _badge(text: str, kind: str = "info") -> str:
+    cls = {"ok": "ok", "warn": "warn", "info": "info"}.get(kind, "info")
+    return f'<span class="badge {cls}">{_html.escape(text)}</span>'
+
+def _bool_badge(flag: bool) -> str:
+    return _badge("ON" if flag else "OFF", "ok" if flag else "warn")
+
+# ---------- API pública p/ N2 ----------
+def n2_bootstrap_and_load(project_root: _Path | None = None) -> _Dict[str, _Any]:
+    """
+    Bootstrap compacto do N2:
+      - resolve PROJECT_ROOT
+      - carrega config (defaults/local)
+      - garante dirs (artifacts/reports/models)
+      - resolve processed_path e lê df
+      - encontra TARGET_COL (case-insensitive)
+      - sumariza tipos via summarize_columns
+    Retorna dict com chaves: project_root, config, artifacts_dir, reports_dir, models_dir,
+                             processed_path, df, target_col, num_cols, cat_cols, other_cols
+    """
+    # raiz
+    try:
+        root = project_root or ensure_project_root()
+    except Exception:
+        root = project_root or get_project_root()
+
+    # config
+    cfg = load_config(root / "config" / "defaults.json", root / "config" / "local.json")
+
+    # dirs
+    artifacts_dir, reports_dir, models_dir = ensure_dirs(cfg)
+
+    # processed
+    processed_path = discover_processed_path(cfg)
+    if not processed_path.is_absolute():
+        processed_path = (root / processed_path).resolve()
+    if not processed_path.exists():
+        raise FileNotFoundError(f"Processed não encontrado: {processed_path}")
+
+    # leitura
+    df = _read_table_auto(processed_path)
+
+    # target e tipos
+    target_col = _find_target_case(df, cfg, fallback="target")
+    if target_col not in df.columns:
+        raise AssertionError(f"Target '{target_col}' não encontrada no dataset.")
+    num_cols, cat_cols, other_cols = summarize_columns(df)
+
+    return {
+        "project_root": root,
+        "config": cfg,
+        "artifacts_dir": artifacts_dir,
+        "reports_dir": reports_dir,
+        "models_dir": models_dir,
+        "processed_path": processed_path,
+        "df": df,
+        "target_col": target_col,
+        "num_cols": num_cols,
+        "cat_cols": cat_cols,
+        "other_cols": other_cols,
+    }
+
+def render_n2_status_panel_light(
+    project_root: _Path,
+    processed_path: _Path,
+    df: _pd.DataFrame,
+    target_name: str,
+    num_cols: list[str],
+    cat_cols: list[str],
+    other_cols: list[str],
+    test_size: float,
+    random_state: int,
+    scale_numeric: bool,
+    target_counts: _pd.Series | None = None,
+    target_pct: _pd.Series | None = None,
+    keep_path_parts: int = 4,
+):
+    """Renderiza o painel limpo do N2 (paleta Aqua/Roxo, fonte maior, caminho abreviado)."""
+    if _HTML is None:
+        return  # ambiente sem notebook
+
+    # métricas
+    n_rows, n_cols = df.shape
+    mem = f"{df.memory_usage(deep=True).sum() / (1024**2):.2f} MB"
+    null_total = int(df.isna().sum().sum())
+    null_any_cols = int((df.isna().sum() > 0).sum())
+
+    # caminhos abreviados
+    fmt_root = _html.escape(_shorten_path(project_root, keep_parts=keep_path_parts))
+    fmt_file = _html.escape(_shorten_path(processed_path, keep_parts=keep_path_parts))
+    fmt_fmt  = _html.escape(processed_path.suffix.lower())
+
+    # distribuição do target
+    if target_counts is None or target_pct is None:
+        _counts = df[target_name].value_counts(dropna=False)
+        _pct = (_counts / len(df) * 100).round(2)
+    else:
+        _counts, _pct = target_counts, target_pct
+    tgt_df = (
+        _pd.DataFrame({"value": _counts.index.astype(str),
+                       "count": _counts.values,
+                       "pct": _pct.values})
+        .sort_values("count", ascending=False)
+        .reset_index(drop=True)
+    )
+    tgt_df["pct"] = tgt_df["pct"].map(lambda x: f"{x:.2f}%")
+    tgt_html = _to_html_table(tgt_df, caption=f"Distribuição de '{target_name}'")
+
+    params_df = _pd.DataFrame({
+        "parâmetro": ["test_size", "random_state", "scale_numeric"],
+        "valor": [test_size, random_state, "ON" if scale_numeric else "OFF"]
+    })
+    params_html = _to_html_table(params_df, caption="Parâmetros (pré-split)")
+
+    css = """
+    <style>
+    .n2-wrap { 
+      --bg:#f7f9fc; --fg:#0f172a; --muted:#6b7280; --card:#ffffff; --edge:#e5e7eb;
+      --aqua:#22d3ee; --aqua-soft:rgba(34,211,238,.15);
+      --purple:#8b5cf6; --purple-soft:rgba(139,92,246,.12);
+      --ok:#10b981; --warn:#f59e0b; --info:#6366f1;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: var(--fg);
+      background: var(--bg);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(2,6,23,.06);
+      font-size: 15px;
+    }
+    .n2-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .n2-title { font-size: 22px; font-weight: 800; letter-spacing: .2px; }
+    .n2-sub { color: var(--muted); font-size: 13px; }
+    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:14px; }
+    .card { background: var(--card); border:1px solid var(--edge); border-radius:14px; padding:14px; box-shadow: 0 3px 8px rgba(2,6,23,.04); }
+    .span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
+    .knum { font-weight:800; font-size: 24px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 14px; }
+    .tbl { border-collapse: collapse; width:100%; font-size: 14px; background: #ffffff; color: var(--fg); border:1px solid var(--edge); border-radius:12px; overflow:hidden; }
+    .tbl th, .tbl td { border-bottom: 1px solid #eef2f7; padding: 10px 12px; }
+    .tbl th { text-align:left; color:#374151; background: linear-gradient(0deg, #fafcff, #f3f6fb); }
+    .tbl-caption { font-size:13px; color: var(--muted); margin: 6px 0 6px 2px; }
+    .accent { box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 2px var(--aqua-soft); }
+    .accent-purple { box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 2px var(--purple-soft); }
+    .badge { border-radius: 999px; padding: 3px 10px; font-size: 12px; border:1px solid var(--edge); }
+    .badge.ok { background: rgba(16,185,129,.14); color:#065f46; border-color: rgba(16,185,129,.35);}
+    .badge.warn { background: rgba(245,158,11,.14); color:#7c4a03; border-color: rgba(245,158,11,.35);}
+    .badge.info { background: var(--purple-soft); color:#4c1d95; border-color: rgba(139,92,246,.35);}
+    </style>
+    """
+
+    html_panel = f"""
+    <div class="n2-wrap accent">
+      <div class="n2-head">
+        <div class="n2-title">N2 — Resumo do Bootstrap e Leitura do Dataset</div>
+        <div class="n2-sub mono">{fmt_fmt} · {n_rows}×{n_cols} · {mem}</div>
+      </div>
+      <div class="grid">
+        <div class="card span-6 accent">
+          <div class="muted">Projeto</div>
+          <div class="mono">{fmt_root}</div>
+          <div class="muted" style="margin-top:10px;">Arquivo lido</div>
+          <div class="mono">{fmt_file}</div>
+        </div>
+
+        <div class="card span-6 accent">
+          <div class="muted">Dimensão</div>
+          <div class="knum">{n_rows} linhas <span class="muted">×</span> {n_cols} colunas</div>
+          <div class="muted" style="margin-top:6px;">Memória estimada: <span class="pill aqua">{mem}</span></div>
+          <div class="muted" style="margin-top:6px;">Nulos: <span class="pill aqua">{null_total} células · {null_any_cols} col(s)</span></div>
+        </div>
+
+        <div class="card span-4 accent">
+          <div class="muted">Tipos de colunas</div>
+          <div class="muted">num: <span class="pill aqua">{len(num_cols)}</span></div>
+          <div class="muted">cat: <span class="pill aqua">{len(cat_cols)}</span></div>
+          <div class="muted">other: <span class="pill aqua">{len(other_cols)}</span></div>
+        </div>
+
+        <div class="card span-4 accent-purple">
+          <div class="muted">Target</div>
+          <div class="knum">{_html.escape(target_name)}</div>
+          <div class="muted">Valores únicos: {df[target_name].nunique()}</div>
+        </div>
+
+        <div class="card span-4 accent">
+          <div class="muted">Parâmetros (pré-split)</div>
+          <div class="muted">test_size · <span class="pill aqua">{test_size}</span></div>
+          <div class="muted" style="margin-top:6px;">random_state · <span class="pill aqua">{random_state}</span></div>
+          <div class="muted" style="margin-top:6px;">scale_numeric · <span class="pill aqua">{'ON' if scale_numeric else 'OFF'}</span></div>
+        </div>
+
+        <div class="card span-6 accent">{tgt_html}</div>
+        <div class="card span-6 accent">{params_html}</div>
+
+        <div class="card span-12 muted" style="text-align:right;">
+          Gerado automaticamente • N2 • {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        </div>
+      </div>
+    </div>
+    """
+    _display(_HTML(css + html_panel))
+
+
+def ensure_utils_import() -> "Path":
+    """
+    Garante que a raiz do projeto e o pacote utils/ estejam acessíveis no sys.path.
+    Retorna o PROJECT_ROOT detectado.
+
+    Uso típico no notebook (N1/N2/N3):
+
+    >>> from utils.utils_data import ensure_utils_import
+    >>> PROJECT_ROOT = ensure_utils_import()
+    >>> import utils.utils_data as ud  # já deve funcionar sem erro de módulo
+
+    Esta função é não-intrusiva: não altera comportamentos existentes, apenas
+    ajusta o sys.path e cria utils/__init__.py se necessário.
+    """
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    def _find_up(relative: str, start: "Path | None" = None) -> "Path | None":
+        start = start or _Path.cwd()
+        rel = _Path(relative)
+        for base in (start, *start.parents):
+            cand = base / rel
+            if cand.exists():
+                return cand
+        return None
+
+    _cfg = _find_up("config/defaults.json")
+    if _cfg is None:
+        raise FileNotFoundError("config/defaults.json não encontrado. Confirme a estrutura do projeto.")
+
+    project_root = _cfg.parent.parent.resolve()
+    utils_dir = project_root / "utils"
+    if not utils_dir.exists():
+        raise ModuleNotFoundError(f"Pasta 'utils' não encontrada em {project_root}")
+
+    init_file = utils_dir / "__init__.py"
+    if not init_file.exists():
+        init_file.write_text("", encoding="utf-8")
+
+    root_str = str(project_root)
+    if root_str not in _sys.path:
+        _sys.path.insert(0, root_str)
+
+    return project_root
+
+# ============================================================================
+# N2 — Bootstrap Reporting Helpers (aditivo, não intrusivo)
+# ============================================================================
+from dataclasses import dataclass
+from typing import Optional, Dict, Any, Tuple
+import numpy as _np
+import pandas as _pd
+from pathlib import Path as _Path
+
+
+@dataclass
+class N2Params:
+    """
+    Parametrização básica usada no resumo do bootstrap do N2.
+
+    Attributes
+    ----------
+    test_size : float
+        Proporção do conjunto de teste (ex.: 0.2 = 20%).
+    random_state : int
+        Semente de aleatoriedade usada em train_test_split/modelos.
+    scale_numeric : bool
+        Indica se as variáveis numéricas serão escalonadas no pré-processamento.
+    """
+    test_size: float = 0.2
+    random_state: int = 42
+    scale_numeric: bool = True
+
+
+def _n2_fmt_mem_mb(df: _pd.DataFrame) -> str:
+    """Retorna o consumo de memória do DataFrame em MB (string formatada)."""
+    mb = df.memory_usage(deep=True).sum() / (1024 ** 2)
+    return f"{mb:.2f} MB"
+
+
+def _n2_dtype_overview(df: _pd.DataFrame) -> Dict[str, int]:
+    """
+    Gera um resumo simples dos tipos:
+    - num: colunas numéricas
+    - cat: todas as demais (object, category, bool, datetime, etc.)
+    - other: reservado (0 nesta heurística).
+    """
+    num = df.select_dtypes(include=[_np.number]).shape[1]
+    cat = df.shape[1] - num
+    return {"num": num, "cat": cat, "other": 0}
+
+
+def _n2_null_overview(df: _pd.DataFrame) -> Tuple[int, int, int]:
+    """
+    Retorna (null_cells, total_cells, cols_with_nulls).
+    """
+    total_cells = df.size
+    null_cells = int(df.isna().sum().sum())
+    cols_with_nulls = int(df.isna().any().sum())
+    return null_cells, total_cells, cols_with_nulls
+
+
+def _n2_class_balance(y: _pd.Series) -> _pd.DataFrame:
+    """
+    DataFrame com contagem e percentual da variável alvo (y).
+    """
+    vc = y.value_counts(dropna=False)
+    pct = (vc / vc.sum() * 100).round(2)
+    return (
+        _pd.DataFrame({"count": vc, "pct": pct})
+        .rename_axis(y.name or "target")
+    )
+
+
+def _n2_params_table(params: N2Params) -> _pd.DataFrame:
+    """
+    Tabela simples com os parâmetros principais (test_size, random_state, scale_numeric).
+    """
+    return _pd.DataFrame(
+        {
+            "parâmetro": ["test_size", "random_state", "scale_numeric"],
+            "valor": [
+                float(params.test_size),
+                int(params.random_state),
+                "ON" if params.scale_numeric else "OFF",
+            ],
+        }
+    )
+
+
+def n2_bootstrap_log_and_report(
+    df: _pd.DataFrame,
+    X: _pd.DataFrame,
+    y: _pd.Series,
+    target_col: str,
+    project_root: Optional[str] = None,
+    processed_file_path: Optional[str] = None,
+    params: Optional[N2Params] = None,
+    print_log: bool = True,
+) -> Dict[str, Any]:
+    """
+    Gera logs e um resumo programático do bootstrap do N2.
+
+    Esta função NÃO altera o DataFrame. Ela apenas:
+      - Imprime logs de diagnóstico (PROJECT_ROOT, arquivo processado, target, shapes, balanceamento).
+      - Calcula estatísticas básicas sobre tipos, nulos, memória.
+      - Retorna um dicionário com artefatos para uso no notebook (markdown + tabelas).
+
+    Parameters
+    ----------
+    df : DataFrame
+        Dataset completo (incluindo a coluna alvo).
+    X : DataFrame
+        Features (df sem a coluna alvo).
+    y : Series
+        Variável alvo.
+    target_col : str
+        Nome da coluna alvo em df.
+    project_root : str, opcional
+        Caminho da raiz do projeto (usado apenas para logging / contexto).
+    processed_file_path : str, opcional
+        Caminho do arquivo processado (data/processed/processed.parquet).
+    params : N2Params, opcional
+        Parâmetros principais (test_size, random_state, scale_numeric).
+    print_log : bool, default True
+        Se True, imprime mensagens no estilo [INFO]/[CHECK].
+
+    Returns
+    -------
+    Dict[str, Any]
+        {
+          "markdown_header": str,
+          "dtype_counts": dict,
+          "class_balance": DataFrame,
+          "params_table": DataFrame,
+          "meta": dict
+        }
+    """
+    params = params or N2Params()
+
+    # Resumos básicos
+    dtype_counts = _n2_dtype_overview(df)
+    null_cells, total_cells, cols_with_nulls = _n2_null_overview(df)
+    mem_est = _n2_fmt_mem_mb(df)
+    rows, cols = df.shape
+
+    # Logs estilo console
+    if print_log:
+        if project_root:
+            print(f"[INFO] PROJECT_ROOT: {project_root}")
+        if project_root and processed_file_path:
+            print(f"[INFO] Projeto:        {project_root}")
+            print(f"[INFO] Processed file: {processed_file_path}")
+        print(f"[INFO] Target column:  {target_col}")
+        print(f"[INFO] Shapes -> X: {X.shape} | y: {y.shape}")
+        print(f"[CHECK] Target nulos={int(y.isna().sum())} | classes únicas={y.nunique()}")
+        # Distribuição da target (sem quebrar em caso extremo)
+        cb = _n2_class_balance(y)
+        print(cb)
+
+    # Artefatos para uso no notebook
+    class_balance = _n2_class_balance(y)
+    params_table = _n2_params_table(params)
+
+    # Texto-resumo tipo "cabeçalho" (pode ser usado em Markdown/painel)
+    fmt_root = f"...{str(project_root)[-60:]}" if project_root else ""
+    fmt_file = f"...{str(processed_file_path)[-60:]}" if processed_file_path else ""
+    header_lines = [
+        "N2 — Resumo do Bootstrap e Leitura do Dataset",
+        f".parquet · {rows}×{cols} · {mem_est}",
+    ]
+    if project_root:
+        header_lines.append("Projeto")
+        header_lines.append(fmt_root)
+    if processed_file_path:
+        header_lines.append("Arquivo lido")
+        header_lines.append(fmt_file)
+    header_lines.append(f"Dimensão\n{rows} linhas × {cols} colunas")
+    header_lines.append(f"Memória estimada: {mem_est}")
+    header_lines.append(f"Nulos: {null_cells} células · {cols_with_nulls} col(s)")
+    header_lines.append(
+        "Tipos de colunas\n"
+        f"num: {dtype_counts['num']}\n"
+        f"cat: {dtype_counts['cat']}\n"
+        f"other: {dtype_counts['other']}"
+    )
+    header_lines.append("Target")
+    header_lines.append(target_col)
+    header_lines.append(f"Valores únicos: {y.nunique()}")
+    header_lines.append(
+        "Parâmetros (pré-split)\n"
+        f"test_size · {params.test_size}\n"
+        f"random_state · {params.random_state}\n"
+        f"scale_numeric · {'ON' if params.scale_numeric else 'OFF'}"
+    )
+    markdown_header = "\n\n".join(header_lines)
+
+    meta = {
+        "rows": rows,
+        "cols": cols,
+        "mem_estimate": mem_est,
+        "null_cells": null_cells,
+        "null_columns": cols_with_nulls,
+        "dtype_counts": dtype_counts,
+        "total_cells": total_cells,
+    }
+
+    return {
+        "markdown_header": markdown_header,
+        "dtype_counts": dtype_counts,
+        "class_balance": class_balance,
+        "params_table": params_table,
+        "meta": meta,
+    }
+
+
+# ============================================================================
+# N2 — Bootstrap compacto e painel de status (para notebook 02)
+# ============================================================================
+
+from typing import Dict, Any
+
+
+def n2_bootstrap_context(config: dict | None = None) -> Dict[str, Any]:
+    """
+    Bootstrap padrão do N2: resolve raiz, carrega config, garante diretórios,
+    descobre o dataset processado, lê o DataFrame e retorna um contexto completo.
+
+    Se `config` for None, `load_config()` é chamado internamente.
+
+    Returns
+    -------
+    dict
+        {
+          "project_root": Path,
+          "cfg": dict,
+          "artifacts_dir": Path,
+          "reports_dir": Path,
+          "models_dir": Path,
+          "processed_path": Path,
+          "df": DataFrame,
+          "X": DataFrame,
+          "y": Series,
+          "target_col": str,
+          "num_cols": list[str],
+          "cat_cols": list[str],
+          "other_cols": list[str],
+          "test_size": float,
+          "random_state": int,
+          "scale_numeric": bool,
+        }
+    """
+    from pathlib import Path as _Path
+    import pandas as _pd
+    import numpy as _np
+
+    # 1) Raiz, config e dirs
+    project_root = get_project_root()
+    if config is None:
+        config = load_config()
+    artifacts_dir, reports_dir, models_dir = ensure_dirs(config)
+
+    # 2) Descobre caminho do processed
+    processed_path = discover_processed_path(config)
+
+    # 3) Leitura robusta do dataset
+    suffix = processed_path.suffix.lower()
+    try:
+        if suffix in (".parquet", ".pq"):
+            try:
+                df = _pd.read_parquet(processed_path, engine="pyarrow")
+            except Exception:
+                df = _pd.read_parquet(processed_path, engine="fastparquet")
+        elif suffix == ".csv":
+            df = _pd.read_csv(processed_path, low_memory=False, encoding="utf-8")
+        elif suffix in (".xlsx", ".xls"):
+            df = _pd.read_excel(processed_path)
+        else:
+            raise ValueError(f"Extensão não suportada: {suffix}")
+    except Exception as e:
+        raise RuntimeError(
+            f"Falha ao ler '{processed_path.name}': {type(e).__name__}: {e}"
+        )
+
+    # 4) Determinação tolerante da coluna alvo
+    cfg_target = (
+        (config.get("target_column"))
+        or (config.get("target", {}) or {}).get("name")
+        or "target"
+    )
+
+    cols_lower = {c.lower(): c for c in df.columns}
+    key = str(cfg_target).lower()
+    if key not in cols_lower:
+        raise KeyError(
+            f"Target '{cfg_target}' não encontrada no dataset. "
+            f"Defina corretamente 'target_column' (ou target.name) em config/defaults.json."
+        )
+    target_col = cols_lower[key]
+
+    X = df.drop(columns=[target_col])
+    y = df[target_col]
+
+    # 5) Tipos de coluna (tenta usar summarize_columns; se falhar, faz fallback)
+    try:
+        num_cols, cat_cols, other_cols = summarize_columns(df)
+    except Exception:
+        num_cols = df.select_dtypes(include=[_np.number]).columns.tolist()
+        cat_cols = [c for c in df.columns if c not in num_cols]
+        other_cols = []
+
+    # 6) Parâmetros de split
+    test_size = config.get("test_size", 0.2)
+    random_state = config.get("random_state", 42)
+    scale_numeric = bool(config.get("scale_numeric", True))
+
+    return {
+        "project_root": project_root,
+        "cfg": config,
+        "artifacts_dir": artifacts_dir,
+        "reports_dir": reports_dir,
+        "models_dir": models_dir,
+        "processed_path": processed_path,
+        "df": df,
+        "X": X,
+        "y": y,
+        "target_col": target_col,
+        "num_cols": num_cols,
+        "cat_cols": cat_cols,
+        "other_cols": other_cols,
+        "test_size": test_size,
+        "random_state": random_state,
+        "scale_numeric": scale_numeric,
+    }
+
+
+def n2_render_status_panel(ctx: Dict[str, Any], keep_path_parts: int = 4) -> None:
+    """
+    Renderiza um painel HTML com o resumo do dataset do N2, seguindo o tema
+    escuro com acentos aqua/roxo (compatível com o formulário de hiperparâmetros).
+
+    Parameters
+    ----------
+    ctx : dict
+        Contexto retornado por `n2_bootstrap_context`.
+    keep_path_parts : int, default 4
+        Quantidade de partes finais do caminho a mostrar (para encurtar o path).
+    """
+    from IPython.display import HTML, display as _display
+    import pandas as _pd
+    import html as _html
+    from datetime import datetime as _dt
+    from pathlib import Path as _Path
+    import numpy as _np  # noqa: F401  (mantido caso queira usar depois)
+
+    df = ctx["df"]
+    target_name = ctx["target_col"]
+    project_root = _Path(ctx["project_root"])
+    processed_path = _Path(ctx["processed_path"])
+    num_cols = ctx["num_cols"]
+    cat_cols = ctx["cat_cols"]
+    other_cols = ctx["other_cols"]
+    test_size = ctx["test_size"]
+    random_state = ctx["random_state"]
+    scale_numeric = ctx["scale_numeric"]
+
+    # ---------- helpers internos ----------
+    def _fmt_bytes(n_bytes: int) -> str:
+        return f"{n_bytes / (1024**2):.2f} MB"
+
+    def _shorten_path(p: _Path | str, keep_parts: int = 4) -> str:
+        p = _Path(p)
+        parts = list(p.parts)
+        if len(parts) <= keep_parts:
+            return str(p)
+        tail = _Path(*parts[-keep_parts:])
+        root = p.anchor
+        if root and not str(tail).startswith(root):
+            return f"...{root}{tail}".replace("\\\\", "\\")
+        return f"...{tail}".replace("\\\\", "\\")
+
+    def _styler_hide_index(sty: _pd.io.formats.style.Styler) -> _pd.io.formats.style.Styler:
+        try:
+            return sty.hide(axis="index")  # pandas >= 2
+        except Exception:
+            try:
+                return sty.hide_index()    # pandas < 2
+            except Exception:
+                return sty
+
+    def _to_html_table(df_: _pd.DataFrame, caption: str | None = None) -> str:
+        sty = (
+            df_.style
+            .set_table_attributes('class="tbl"')
+            .set_properties(**{"text-align": "right", "padding": "6px 10px"})
+        )
+        sty = _styler_hide_index(sty)
+        html_tbl = sty.to_html()
+        if caption:
+            html_tbl = f'<div class="tbl-caption">{_html.escape(caption)}</div>' + html_tbl
+        return html_tbl
+
+    def _badge(text: str, kind: str = "info") -> str:
+        cls = {"ok": "ok", "warn": "warn", "info": "info"}.get(kind, "info")
+        return f'<span class="badge {cls}">{_html.escape(text)}</span>'
+
+    def _bool_badge(flag: bool) -> str:
+        return _badge("ON" if flag else "OFF", "ok" if flag else "warn")
+
+    # ---------- métricas básicas ----------
+    n_rows, n_cols = df.shape
+    mem = _fmt_bytes(df.memory_usage(deep=True).sum())
+    null_total = int(df.isna().sum().sum())
+    null_any_cols = int(df.isna().any().sum())
+
+    fmt_root = _html.escape(_shorten_path(project_root, keep_parts=keep_path_parts))
+    fmt_file = _html.escape(_shorten_path(processed_path, keep_parts=keep_path_parts))
+    fmt_fmt = _html.escape(processed_path.suffix.lower())
+
+    # Distribuição da target
+    counts = df[target_name].value_counts(dropna=False)
+    pct = (counts / len(df) * 100).round(2)
+    tgt_df = (
+        _pd.DataFrame(
+            {
+                "value": counts.index.astype(str),
+                "count": counts.values,
+                "pct": pct.values,
+            }
+        )
+        .sort_values("count", ascending=False)
+        .reset_index(drop=True)
+    )
+    tgt_df["pct"] = tgt_df["pct"].map(lambda x: f"{x:.2f}%")
+    tgt_html = _to_html_table(tgt_df, caption=f"Distribuição de '{target_name}'")
+
+    params_df = _pd.DataFrame(
+        {
+            "parâmetro": ["test_size", "random_state", "scale_numeric"],
+            "valor": [test_size, random_state, "ON" if scale_numeric else "OFF"],
+        }
+    )
+    params_html = _to_html_table(params_df, caption="Parâmetros (pré-split)")
+
+    # ---------- CSS + HTML ----------
+    css = """
+    <style>
+    .n2-wrap { 
+      --bg:#f7f9fc; --fg:#0f172a; --muted:#6b7280; --card:#ffffff; --edge:#e5e7eb;
+      --aqua:#22d3ee; --aqua-soft:rgba(34,211,238,.15);
+      --purple:#8b5cf6; --purple-soft:rgba(139,92,246,.12);
+      --ok:#10b981; --warn:#f59e0b; --info:#6366f1;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: var(--fg);
+      background: var(--bg);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(2,6,23,.06);
+      font-size: 15px;
+    }
+    .n2-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .n2-title { font-size: 22px; font-weight: 800; letter-spacing: .2px; }
+    .n2-sub { color: var(--muted); font-size: 13px; }
+    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:14px; }
+    .card { background: var(--card);
+            border:1px solid var(--edge); border-radius:14px; padding:14px;
+            box-shadow: 0 3px 8px rgba(2,6,23,.04); }
+    .span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
+    .knum { font-weight:800; font-size: 24px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 14px; }
+    .kv { display:flex; align-items:center; gap:10px; margin:6px 0; }
+
+    .pill {
+      display:inline-block;
+      border-radius:999px;
+      border:1px solid var(--edge);
+      padding:3px 10px;
+      font-size:13px;
+      background:#fbfdff;
+      color:inherit;
+    }
+    .pill.aqua {
+      border-color: var(--aqua);
+      background: var(--aqua-soft);
+    }
+
+    .badge { border-radius: 999px; padding: 3px 10px; font-size: 12px; border:1px solid var(--edge); }
+    .badge.ok { background: rgba(16,185,129,.14); color:#065f46; border-color: rgba(16,185,129,.35);}
+    .badge.warn { background: rgba(245,158,11,.14); color:#7c4a03; border-color: rgba(245,158,11,.35);}
+    .badge.info { background: var(--purple-soft); color:#4c1d95; border-color: rgba(139,92,246,.35);}
+    .tbl { border-collapse: collapse; width:100%; font-size: 14px; background: #ffffff;
+           color: var(--fg); border:1px solid var(--edge); border-radius:12px; overflow:hidden; }
+    .tbl th, .tbl td { border-bottom: 1px solid #eef2f7; padding: 10px 12px; }
+    .tbl th { text-align:left; color:#374151;
+              background: linear-gradient(0deg, #fafcff, #f3f6fb); }
+    .tbl-caption { font-size:13px; color: var(--muted); margin: 6px 0 6px 2px; }
+    .accent { box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 2px var(--aqua-soft); }
+    .accent-purple { box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 2px var(--purple-soft); }
+    </style>
+    """
+
+    html_panel = f"""
+    <div class="n2-wrap accent">
+      <div class="n2-head">
+        <div class="n2-title">N2 — Resumo do Bootstrap e Leitura do Dataset</div>
+        <div class="n2-sub mono">{fmt_fmt} · {n_rows}×{n_cols} · {mem}</div>
+      </div>
+      <div class="grid">
+        <div class="card span-6 accent">
+          <div class="muted">Projeto</div>
+          <div class="mono">{fmt_root}</div>
+          <div class="muted" style="margin-top:10px;">Arquivo lido</div>
+          <div class="mono">{fmt_file}</div>
+        </div>
+
+        <div class="card span-6 accent">
+          <div class="muted">Dimensão</div>
+          <div class="knum">{n_rows} linhas <span class="muted">×</span> {n_cols} colunas</div>
+          <div class="kv"><span class="muted">Memória estimada:</span> <span class="pill aqua">{mem}</span></div>
+          <div class="kv"><span class="muted">Nulos:</span> <span class="pill aqua">{null_total} células · {null_any_cols} col(s)</span></div>
+        </div>
+
+        <div class="card span-4 accent">
+          <div class="muted">Tipos de colunas</div>
+          <div class="kv"><span class="pill aqua">num: {len(num_cols)}</span></div>
+          <div class="kv"><span class="pill aqua">cat: {len(cat_cols)}</span></div>
+          <div class="kv"><span class="pill aqua">other: {len(other_cols)}</span></div>
+        </div>
+
+        <div class="card span-4 accent-purple">
+          <div class="muted">Target</div>
+          <div class="knum">{_html.escape(target_name)}</div>
+          <div class="muted">Valores únicos: {df[target_name].nunique()}</div>
+        </div>
+
+        <div class="card span-4 accent">
+          <div class="muted">Parâmetros (pré-split)</div>
+          <div class="kv"><span class="muted">test_size</span><span class="pill aqua">{test_size}</span></div>
+          <div class="kv"><span class="muted">random_state</span><span class="pill aqua">{random_state}</span></div>
+          <div class="kv"><span class="muted">scale_numeric</span>{_bool_badge(scale_numeric)}</div>
+        </div>
+
+        <div class="card span-6 accent">
+          {tgt_html}
+        </div>
+
+        <div class="card span-6 accent">
+          {params_html}
+        </div>
+
+        <div class="card span-12 muted" style="text-align:right;">
+          Gerado automaticamente • N2 • {_dt.now().strftime('%Y-%m-%d %H:%M:%S')}
+        </div>
+      </div>
+    </div>
+    """
+    _display(HTML(css + html_panel))
