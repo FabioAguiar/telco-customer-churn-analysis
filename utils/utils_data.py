@@ -5105,3 +5105,339 @@ def n2_render_status_panel(ctx: Dict[str, Any], keep_path_parts: int = 4) -> Non
     </div>
     """
     _display(HTML(css + html_panel))
+
+
+# =============================================================================
+# N2 — Split treino/teste & resumo de colunas (display)
+# =============================================================================
+
+def _n2_make_target_distribution_table(y, target_name="target"):
+    """
+    Gera uma tabela com contagem e percentual da variável alvo.
+
+    Parameters
+    ----------
+    y : pandas.Series
+        Série da variável alvo.
+    target_name : str, default "target"
+        Nome da coluna alvo (para rótulo da tabela).
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame indexado pelos valores da target,
+        com colunas 'count' e 'pct'.
+    """
+    import pandas as pd
+
+    if y is None:
+        return pd.DataFrame(columns=["count", "pct"])
+
+    vc = y.value_counts(dropna=False)
+    total = vc.sum() if vc.sum() else 1
+    pct = (vc / total * 100).round(2)
+
+    df = pd.DataFrame({"count": vc, "pct": pct})
+    df.index.name = target_name
+    return df
+
+
+def n2_display_split_and_column_summary(
+    *,
+    numeric_cols,
+    categorical_cols,
+    ignored_cols,
+    X_train,
+    X_test,
+    y_train,
+    y_test,
+    target_name,
+    split_params=None,
+    rare_categories=None,
+    rare_threshold=None,
+    logger=None,
+):
+    """
+    Exibe um painel resumido (HTML) do split treino/teste e da distribuição
+    da variável alvo, em um layout mais organizado e coeso, alinhado ao painel N2.
+
+    Esta função é apenas de APRESENTAÇÃO. A lógica de preparação
+    (separar X/y, fazer o train_test_split, etc.) continua no notebook.
+    """
+    import pandas as pd
+    from IPython.display import display, HTML
+
+    split_params = split_params or {}
+    rare_categories = rare_categories or {}
+    ignored_cols = ignored_cols or []
+
+    # ------------------------------------------------------------------
+    # 1) Log textual (somente via logger; prints ficam no notebook)
+    # ------------------------------------------------------------------
+    msg_cols = (
+        f"Colunas numéricas: {len(numeric_cols)} | "
+        f"categóricas: {len(categorical_cols)} | "
+        f"ignoradas: {len(ignored_cols)}"
+    )
+    msg_split = (
+        "Split params -> "
+        f"test_size={split_params.get('test_size')} | "
+        f"random_state={split_params.get('random_state')} | "
+        f"stratify={split_params.get('stratify')}"
+    )
+    msg_shapes = (
+        f"X_train: {X_train.shape} | "
+        f"X_test: {X_test.shape}"
+    )
+
+    if logger is not None:
+        logger.info(msg_cols)
+        logger.info(msg_split)
+        logger.info(msg_shapes)
+
+    # ------------------------------------------------------------------
+    # 2) Distribuições da target (geral / train / test)
+    # ------------------------------------------------------------------
+    y_all = pd.concat([y_train, y_test], axis=0)
+
+    df_all = _n2_make_target_distribution_table(y_all, target_name=target_name).reset_index()
+    df_tr = _n2_make_target_distribution_table(y_train, target_name=target_name).reset_index()
+    df_te = _n2_make_target_distribution_table(y_test, target_name=target_name).reset_index()
+
+    def _build_table_html(df: pd.DataFrame) -> str:
+        if df.empty:
+            return "<em>Sem dados</em>"
+
+        headers = "".join(
+            f"<th>{col}</th>" for col in df.columns
+        )
+        body_rows = []
+        for _, row in df.iterrows():
+            cells = "".join(f"<td>{row[col]}</td>" for col in df.columns)
+            body_rows.append(f"<tr>{cells}</tr>")
+        body = "".join(body_rows)
+
+        return f"""
+        <table class="n2p-table">
+          <thead><tr>{headers}</tr></thead>
+          <tbody>{body}</tbody>
+        </table>
+        """
+
+    card_all = f"""
+      <div class="n2p-mini-card">
+        <div class="n2p-mini-title">Geral</div>
+        {_build_table_html(df_all)}
+      </div>
+    """
+
+    card_tr = f"""
+      <div class="n2p-mini-card">
+        <div class="n2p-mini-title">Train</div>
+        {_build_table_html(df_tr)}
+      </div>
+    """
+
+    card_te = f"""
+      <div class="n2p-mini-card">
+        <div class="n2p-mini-title">Test</div>
+        {_build_table_html(df_te)}
+      </div>
+    """
+
+    dist_block_html = f"""
+      <div class="n2p-section">
+        <div class="n2p-section-title">
+          Distribuição da target — geral / train / test
+        </div>
+        <div class="n2p-grid-3">
+          {card_all}
+          {card_tr}
+          {card_te}
+        </div>
+      </div>
+    """
+
+    # ------------------------------------------------------------------
+    # 3) Categorias raras
+    # ------------------------------------------------------------------
+    if rare_categories:
+        th = rare_threshold if rare_threshold is not None else "limiar configurado"
+        rare_rows = [
+            {"column": col, "n_rare_categories": n_rare}
+            for col, n_rare in rare_categories.items()
+        ]
+        df_rare = pd.DataFrame(rare_rows).sort_values(
+            "n_rare_categories", ascending=False
+        )
+
+        rare_table = _build_table_html(df_rare)
+
+        rare_block_html = f"""
+          <div class="n2p-section">
+            <div class="n2p-section-title">
+              Colunas categóricas com categorias raras (&lt; {th} amostras) no train
+            </div>
+            <div class="n2p-mini-card n2p-mini-full">
+              {rare_table}
+            </div>
+          </div>
+        """
+    else:
+        rare_block_html = """
+          <div class="n2p-section">
+            <div class="n2p-section-title">
+              Nenhuma coluna categórica com categorias raras no train com o limite atual.
+            </div>
+          </div>
+        """
+
+    # ------------------------------------------------------------------
+    # 4) Card único com tudo dentro (estilo alinhado ao painel N2)
+    # ------------------------------------------------------------------
+    html = f"""
+
+    <style>
+      .n2p-card {{
+        background: #f8fafc;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        border-radius: 16px;
+        padding: 16px 20px 18px 20px;
+        margin: 10px 0 16px 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }}
+
+      .n2p-title {{
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }}
+
+      .n2p-header-row {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+      }}
+
+      .n2p-header-block {{
+        min-width: 180px;
+      }}
+
+      .n2p-label {{
+        opacity: 0.75;
+        font-size: 0.8rem;
+        margin-bottom: 2px;
+        color: #64748b;
+      }}
+
+      .n2p-section {{
+        margin-top: 14px;
+        font-size: 0.9rem;
+      }}
+
+      .n2p-section-title {{
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #0f172a;
+      }}
+
+      .n2p-grid-3 {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }}
+
+      .n2p-mini-card {{
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 10px 12px;
+        flex: 1 1 220px;
+      }}
+
+      .n2p-mini-full {{
+        flex: 1 1 100%;
+      }}
+
+      .n2p-mini-title {{
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: #0f172a;
+      }}
+
+      .n2p-table {{
+        border-collapse: collapse;
+        margin-top: 4px;
+        font-size: 0.84rem;
+        width: 100%;
+      }}
+
+      .n2p-table th {{
+        background: #e2f3ff;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        padding: 4px 8px;
+        text-align: center;
+        font-weight: 600;
+      }}
+
+      .n2p-table td {{
+        background: #ffffff;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        padding: 4px 8px;
+        text-align: center;
+      }}
+
+      .n2p-table tbody tr:nth-child(even) td {{
+        background: #f1f5f9;
+      }}
+    </style>
+
+    <div class="n2p-card">
+
+      <div class="n2p-title">
+        Split treino/teste &amp; resumo de colunas
+      </div>
+
+      <div class="n2p-header-row">
+
+        <div class="n2p-header-block">
+          <div class="n2p-label">Colunas</div>
+          <div>
+            numéricas: <strong>{len(numeric_cols)}</strong> ·
+            categóricas: <strong>{len(categorical_cols)}</strong> ·
+            ignoradas: <strong>{len(ignored_cols)}</strong>
+          </div>
+        </div>
+
+        <div class="n2p-header-block">
+          <div class="n2p-label">Parâmetros do split</div>
+          <div>
+            test_size=<strong>{split_params.get('test_size')}</strong> ·
+            random_state=<strong>{split_params.get('random_state')}</strong> ·
+            stratify=<strong>{split_params.get('stratify')}</strong>
+          </div>
+        </div>
+
+        <div class="n2p-header-block">
+          <div class="n2p-label">Shapes</div>
+          <div>
+            X_train: <strong>{X_train.shape}</strong> ·
+            X_test: <strong>{X_test.shape}</strong>
+          </div>
+        </div>
+
+      </div>
+
+      {dist_block_html}
+      {rare_block_html}
+
+    </div>
+    """
+
+    display(HTML(html))
