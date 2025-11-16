@@ -5441,3 +5441,201 @@ def n2_display_split_and_column_summary(
     """
 
     display(HTML(html))
+
+
+# =============================================================================
+# N2 — Painel de pré-processamento (One-Hot + escala)
+# =============================================================================
+
+def n2_display_preprocess_summary(
+    *,
+    num_cols,
+    cat_cols,
+    scale_numeric,
+    X_train_t,
+    X_test_t,
+    feat_names=None,
+    mem_train=None,
+    mem_test=None,
+):
+    """
+    Exibe um painel resumindo o pré-processamento:
+      - quantidade de colunas numéricas/categóricas de entrada
+      - shapes transformados (X_train_t, X_test_t)
+      - uso de escala em numéricas
+      - memória estimada dos arrays transformados
+      - preview dos nomes de features geradas (tabela 3 colunas)
+
+    Esta função é apenas de apresentação.
+    """
+    import numpy as _np
+    from IPython.display import HTML, display
+
+    # ---------------------------------------------------------
+    # Cálculos auxiliares
+    # ---------------------------------------------------------
+    n_in_num = len(num_cols)
+    n_in_cat = len(cat_cols)
+
+    n_train, n_features = X_train_t.shape
+    n_test  = X_test_t.shape[0]
+
+    def _mb(nbytes):
+        return (float(nbytes) / (1024.0 ** 2)) if nbytes is not None else None
+
+    if mem_train is None and isinstance(X_train_t, _np.ndarray):
+        mem_train = X_train_t.nbytes
+    if mem_test is None and isinstance(X_test_t, _np.ndarray):
+        mem_test = X_test_t.nbytes
+
+    mem_train_mb = _mb(mem_train)
+    mem_test_mb  = _mb(mem_test)
+
+    # Preview das features (até 24) organizado em tabela 3 colunas
+    preview_feats = []
+    if feat_names is not None:
+        preview_feats = list(feat_names[:24])
+
+    rows_html = ""
+    if preview_feats:
+        for i in range(0, len(preview_feats), 3):
+            row = preview_feats[i:i+3]
+            # completa com strings vazias se faltar coluna
+            while len(row) < 3:
+                row.append("")
+            cells = "".join(f"<td>{name}</td>" for name in row)
+            rows_html += f"<tr>{cells}</tr>"
+        features_table_html = f"""
+          <table class="n2pp-feature-table">
+            <thead>
+              <tr>
+                <th>feature 1</th>
+                <th>feature 2</th>
+                <th>feature 3</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows_html}
+            </tbody>
+          </table>
+        """
+    else:
+        features_table_html = "<em>Preview indisponível (feat_names=None).</em>"
+
+    # ---------------------------------------------------------
+    # HTML + CSS (padrão N2, tema claro)
+    # ---------------------------------------------------------
+    html = f"""
+    <style>
+      .n2pp-card {{
+        background: #f8fafc;
+        color: #0f172a;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 14px 18px 18px 18px;
+        margin: 10px 0 20px 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 0.9rem;
+      }}
+      .n2pp-title {{
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }}
+      .n2pp-header-row {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 10px;
+      }}
+      .n2pp-header-block {{
+        min-width: 180px;
+      }}
+      .n2pp-label {{
+        font-size: 0.8rem;
+        opacity: 0.7;
+        margin-bottom: 2px;
+      }}
+      .n2pp-value-strong {{
+        font-weight: 600;
+      }}
+      .n2pp-mono {{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                     "Liberation Mono", "Courier New", monospace;
+      }}
+      .n2pp-section {{
+        margin-top: 10px;
+      }}
+      .n2pp-section-title {{
+        font-weight: 600;
+        margin-bottom: 4px;
+      }}
+      .n2pp-feature-table {{
+        border-collapse: collapse;
+        margin-top: 4px;
+        font-size: 0.82rem;
+        width: 100%;
+        max-width: 640px;
+      }}
+      .n2pp-feature-table th,
+      .n2pp-feature-table td {{
+        border: 1px solid #e2e8f0;
+        padding: 4px 6px;
+        text-align: left;
+      }}
+      .n2pp-feature-table thead th {{
+        background: #e0f2fe;
+        color: #075985;
+        font-weight: 600;
+      }}
+      .n2pp-feature-table tbody tr:nth-child(odd) td {{
+        background: #f1f5f9;
+      }}
+    </style>
+
+    <div class="n2pp-card">
+      <div class="n2pp-title">
+        Pré-processamento — One-Hot denso + escala
+      </div>
+
+      <div class="n2pp-header-row">
+        <div class="n2pp-header-block">
+          <div class="n2pp-label">Colunas de entrada</div>
+          <div>
+            numéricas: <span class="n2pp-value-strong">{n_in_num}</span> ·
+            categóricas: <span class="n2pp-value-strong">{n_in_cat}</span>
+          </div>
+        </div>
+
+        <div class="n2pp-header-block">
+          <div class="n2pp-label">Shapes transformados</div>
+          <div class="n2pp-mono">
+            X_train_t: <span class="n2pp-value-strong">({n_train}, {n_features})</span><br/>
+            X_test_t: <span class="n2pp-value-strong">({n_test}, {n_features})</span>
+          </div>
+        </div>
+
+        <div class="n2pp-header-block">
+          <div class="n2pp-label">Parâmetros</div>
+          <div>
+            escala numérica: <span class="n2pp-value-strong">{'ON' if scale_numeric else 'OFF'}</span>
+          </div>
+        </div>
+
+        <div class="n2pp-header-block">
+          <div class="n2pp-label">Memória estimada</div>
+          <div>
+            train: <span class="n2pp-value-strong">{mem_train_mb:.2f} MB</span> ·
+            test: <span class="n2pp-value-strong">{mem_test_mb:.2f} MB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="n2pp-section">
+        <div class="n2pp-section-title">Preview de features transformadas</div>
+        {features_table_html}
+      </div>
+    </div>
+    """
+
+    display(HTML(html))
